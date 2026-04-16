@@ -301,11 +301,7 @@ function RecordMatrix({ records }: { records: NTRecord[] }) {
                     }}
                   >
                     <td className="px-3 py-2">
-                      <span
-                        className="text-[11px] font-serif font-semibold text-stone-800 leading-tight block cursor-pointer hover:text-ds-a transition-colors"
-                        onClick={(e) => { e.stopPropagation(); openVerse(r.ref); }}
-                        title="View verse text"
-                      >
+                      <span className="text-[11px] font-serif font-semibold text-stone-800 leading-tight block">
                         {r.ref}
                       </span>
                       <span className="text-[9px] text-stone-400">{shortCat(r.category || "")}</span>
@@ -320,7 +316,11 @@ function RecordMatrix({ records }: { records: NTRecord[] }) {
                     </td>
                     <td className="px-3 py-2 max-w-xs">
                       {r.summary ? (
-                        <span className="text-[11px] text-stone-500 leading-snug line-clamp-1">
+                        <span
+                          className="text-[11px] text-stone-500 leading-snug line-clamp-1 cursor-pointer hover:text-stone-800 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); openVerse(r.ref); }}
+                          title="View verse text"
+                        >
                           {r.summary}
                         </span>
                       ) : (
@@ -423,11 +423,7 @@ function RecordGroup({ rating, records }: { rating: Rating; records: NTRecord[] 
             return (
               <li key={`${p.ref}-${i}`} className="px-4 py-3 bg-stone-50/50">
                 <div className="flex items-start justify-between gap-3 mb-1.5">
-                  <span
-                    className="text-[12px] font-serif font-semibold text-stone-800 cursor-pointer hover:text-ds-a transition-colors"
-                    onClick={() => openVerse(p.ref)}
-                    title="View verse text"
-                  >
+                  <span className="text-[12px] font-serif font-semibold text-stone-800">
                     {p.ref}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
@@ -448,7 +444,22 @@ function RecordGroup({ rating, records }: { rating: Rating; records: NTRecord[] 
                     </div>
                   ))}
                 </div>
-                {p.q2_notes && <p className="text-[11px] text-stone-500 leading-relaxed">{p.q2_notes}</p>}
+                {p.q2_notes ? (
+                  <p
+                    className="text-[11px] text-stone-500 leading-relaxed cursor-pointer hover:text-stone-800 transition-colors"
+                    onClick={() => openVerse(p.ref)}
+                    title="View verse text"
+                  >
+                    {p.q2_notes}
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => openVerse(p.ref)}
+                    className="text-[10px] text-stone-400 hover:text-stone-600 italic transition-colors"
+                  >
+                    View verse text &rarr;
+                  </button>
+                )}
               </li>
             );
           })}

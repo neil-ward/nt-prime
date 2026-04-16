@@ -58,11 +58,7 @@ function PassageRow({ p }: { p: NTRecord }) {
 
       {/* Ref + meta */}
       <div className="w-[140px] shrink-0 pt-px">
-        <p
-          className="text-[13px] font-serif font-semibold text-stone-800 leading-tight cursor-pointer hover:text-ds-a transition-colors"
-          onClick={() => openVerse(p.ref)}
-          title="View verse text"
-        >
+        <p className="text-[13px] font-serif font-semibold text-stone-800 leading-tight">
           {p.ref}
         </p>
         <p className="text-[10px] text-stone-400 mt-0.5">{p.speaker_group}</p>
@@ -101,10 +97,21 @@ function PassageRow({ p }: { p: NTRecord }) {
             {p.category}{p.theme && p.theme !== p.category ? ` · ${p.theme}` : ""}
           </p>
         )}
-        {p.summary && (
-          <p className="text-[12px] text-stone-600 leading-relaxed line-clamp-2">
+        {p.summary ? (
+          <p
+            className="text-[12px] text-stone-600 leading-relaxed line-clamp-2 cursor-pointer hover:text-stone-900 transition-colors"
+            onClick={() => openVerse(p.ref)}
+            title="View verse text"
+          >
             {p.summary}
           </p>
+        ) : (
+          <button
+            onClick={() => openVerse(p.ref)}
+            className="text-[11px] text-stone-400 hover:text-stone-600 italic transition-colors"
+          >
+            View verse text &rarr;
+          </button>
         )}
       </div>
 

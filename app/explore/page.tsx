@@ -135,11 +135,7 @@ function PassagePanel({
                   className="px-4 py-3 hover:bg-stone-50/80 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <span
-                      className="text-[12px] font-semibold text-stone-800 font-serif leading-tight cursor-pointer hover:text-ds-a transition-colors"
-                      onClick={(e) => { e.stopPropagation(); openVerse(p.ref); }}
-                      title="View verse text"
-                    >
+                    <span className="text-[12px] font-semibold text-stone-800 font-serif leading-tight">
                       {p.ref}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -171,10 +167,21 @@ function PassagePanel({
                       {p.category}
                     </p>
                   )}
-                  {p.summary && (
-                    <p className="text-[11px] text-stone-500 leading-relaxed line-clamp-2 mt-0.5">
+                  {p.summary ? (
+                    <p
+                      className="text-[11px] text-stone-500 leading-relaxed line-clamp-2 mt-0.5 cursor-pointer hover:text-stone-800 transition-colors"
+                      onClick={() => openVerse(p.ref)}
+                      title="View verse text"
+                    >
                       {p.summary}
                     </p>
+                  ) : (
+                    <button
+                      onClick={() => openVerse(p.ref)}
+                      className="text-[10px] text-stone-400 hover:text-stone-600 italic transition-colors mt-0.5"
+                    >
+                      View verse text &rarr;
+                    </button>
                   )}
                 </li>
               );

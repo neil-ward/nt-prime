@@ -1,188 +1,239 @@
 // ---------------------------------------------------------------------------
-// GET /api/verse — fetch verse text from YouVersion Platform API
+// GET /api/verse — fetch a Bible passage with surrounding context + Greek
 //
 // Query params:
-//   ref     — App-style reference, e.g. "Matt 5:42", "1 Cor 13:4-7"
-//   version — Translation abbreviation (default "NIV")
+//   ref     — App-style reference (e.g. "Matt 5:42", "1 Cor 13:4-7")
+//   version — Translation key from VERSIONS map (default NIV)
+//   context — Verses to include on each side of the selection (default 4)
 //
 // Returns:
-//   { ref, text, version, copyright }
+//   {
+//     reference:     "Matthew 5:38-46",
+//     book:          "Matthew",
+//     chapter:       5,
+//     selectedStart: 42,
+//     selectedEnd:   42,
+//     version:       "NIV",
+//     verses:        [ { num, english, greek } ],
+//     copyright:     "…",
+//     greekAttribution: "…"
+//   }
 //
-// Graceful degradation:
-//   - 503 if YOUVERSION_API_TOKEN is not configured
-//   - 400 if ref is missing or unparseable
-//   - 502 if the upstream API call fails
-//
-// API details (YouVersion Platform):
-//   Base URL:  https://api.youversion.com/v1/
-//   Auth:      X-YVP-App-Key header
-//   Endpoint:  /bibles/{bibleId}/passages/{USFM}
-//   Response:  { id, content, reference }
+// Implementation notes:
+//   - N parallel YouVersion fetches (2 per verse: English + Greek).
+//   - Per-verse in-memory cache keyed (bibleId, usfm) for 15 min.
+//   - Gracefully handles 404s (past chapter end, or Greek missing).
 // ---------------------------------------------------------------------------
 
 import { type NextRequest, NextResponse } from "next/server";
-import { refToUSFM } from "@/lib/youversion";
+import {
+  parseRef,
+  VERSIONS,
+  GREEK_BIBLE_ID,
+  GREEK_LABEL,
+  type VersionKey,
+} from "@/lib/youversion";
 
 // ---------------------------------------------------------------------------
-// Available Bible versions (ID used by YouVersion Platform API)
-// ESV is not available through this API — requires separate Crossway license.
-// ---------------------------------------------------------------------------
-
-const BIBLE_IDS: Record<string, number> = {
-  NIV:      111,    // New International Version 2011
-  NASB:     2692,   // New American Standard Bible 2020
-  NASB1995: 100,    // NASB 1995
-  BSB:      3034,   // Berean Standard Bible
-  AMP:      1588,   // Amplified Bible
-  ASV:      12,     // American Standard Version
-  NLT:      1849,   // The Passion Translation (closest popular option)
-  LSV:      2660,   // Literal Standard Version
-};
-
-// Copyright notices per version
-const COPYRIGHT: Record<string, string> = {
-  NIV:  "Scripture quotations taken from the Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™",
-  NASB: "Scripture quotations taken from the (NASB®) New American Standard Bible®. Copyright © 2020 by The Lockman Foundation.",
-  BSB:  "Scripture quotations from the Berean Standard Bible. Public domain.",
-  AMP:  "Scripture quotations taken from the Amplified® Bible. Copyright © 2015 by The Lockman Foundation.",
-  ASV:  "American Standard Version. Public domain.",
-  LSV:  "Literal Standard Version. Copyright © 2020 Covenant Press.",
-};
-
-// ---------------------------------------------------------------------------
-// In-memory cache — keeps verse text for 15 minutes
+// Per-verse in-memory cache
 // ---------------------------------------------------------------------------
 
 interface CacheEntry {
-  text: string;
-  reference: string;
+  text:      string | null;   // null means 404 (caches negative results)
   fetchedAt: number;
 }
 
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
+function cacheKey(bibleId: number, usfm: string) {
+  return `${bibleId}:${usfm}`;
+}
+
+/**
+ * Fetch a single verse from the YouVersion Platform API.
+ * Returns null on 404. Throws on other errors.
+ */
+async function fetchVerse(
+  bibleId: number,
+  usfm: string,
+  token: string,
+): Promise<string | null> {
+  const key = cacheKey(bibleId, usfm);
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.text;
+  }
+
+  const url = `https://api.youversion.com/v1/bibles/${bibleId}/passages/${encodeURIComponent(usfm)}`;
+  const res = await fetch(url, {
+    headers: { "X-YVP-App-Key": token, Accept: "application/json" },
+  });
+
+  if (res.status === 404) {
+    cache.set(key, { text: null, fetchedAt: Date.now() });
+    return null;
+  }
+
+  if (!res.ok) {
+    throw new Error(`YouVersion API ${res.status} for ${usfm}`);
+  }
+
+  const data = await res.json();
+  const text = (data.content || data.text || "").trim();
+  cache.set(key, { text, fetchedAt: Date.now() });
+  return text || null;
+}
+
+// ---------------------------------------------------------------------------
+// Range expansion — pericope heuristic (±context verses)
+// ---------------------------------------------------------------------------
+
+function expandRange(
+  chapter: number,
+  selStart: number,
+  selEnd: number,
+  context: number,
+): { first: number; last: number } {
+  // Lower bound: selected start - context, but never below 1
+  const first = Math.max(1, selStart - context);
+  // Upper bound: selected end + context. We don't know chapter length up
+  // front — we'll stop at the first 404 when fetching.
+  const last  = selEnd + context;
+  void chapter;
+  return { first, last };
+}
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {
-  // 1. Check for API token
   const token = process.env.YOUVERSION_API_TOKEN;
   if (!token) {
     return NextResponse.json(
-      { error: "Verse text not configured — set YOUVERSION_API_TOKEN in .env.local" },
+      { error: "Verse text not configured — set YOUVERSION_API_TOKEN" },
       { status: 503 },
     );
   }
 
-  // 2. Parse query params
   const { searchParams } = request.nextUrl;
-  const ref = searchParams.get("ref");
-  const versionParam = (searchParams.get("version") || "NIV").toUpperCase();
+  const refParam     = searchParams.get("ref");
+  const versionParam = (searchParams.get("version") || "NIV").toUpperCase() as VersionKey;
+  const contextParam = Math.max(0, Math.min(10, parseInt(searchParams.get("context") || "4", 10) || 4));
 
-  if (!ref) {
+  if (!refParam) {
     return NextResponse.json(
       { error: "Missing required query parameter: ref" },
       { status: 400 },
     );
   }
 
-  // 3. Convert ref to USFM
-  const usfm = refToUSFM(ref);
-  if (!usfm) {
+  // 1. Parse the ref
+  const parsed = parseRef(refParam);
+  if (!parsed) {
     return NextResponse.json(
-      { error: `Could not parse ref: "${ref}"` },
+      { error: `Could not parse ref: "${refParam}"` },
       { status: 400 },
     );
   }
 
-  // 4. Resolve Bible version ID
-  const bibleId = BIBLE_IDS[versionParam];
-  if (!bibleId) {
+  // 2. Resolve version
+  const version = VERSIONS[versionParam];
+  if (!version) {
     return NextResponse.json(
-      { error: `Unknown version: "${versionParam}". Available: ${Object.keys(BIBLE_IDS).join(", ")}` },
+      { error: `Unknown version: "${versionParam}". Available: ${Object.keys(VERSIONS).join(", ")}` },
       { status: 400 },
     );
   }
 
-  // 5. Check cache
-  const cacheKey = `${usfm}:${bibleId}`;
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+  // 3. Compute range
+  const { first, last } = expandRange(
+    parsed.chapter,
+    parsed.verseStart,
+    parsed.verseEnd,
+    contextParam,
+  );
+
+  // 4. Build USFM ids for every verse in the range
+  const verseNumbers: number[] = [];
+  for (let v = first; v <= last; v++) verseNumbers.push(v);
+
+  const englishFetches = verseNumbers.map((n) =>
+    fetchVerse(version.id, `${parsed.usfmBook}.${parsed.chapter}.${n}`, token)
+      .catch(() => null),
+  );
+  const greekFetches = verseNumbers.map((n) =>
+    fetchVerse(GREEK_BIBLE_ID, `${parsed.usfmBook}.${parsed.chapter}.${n}`, token)
+      .catch(() => null),
+  );
+
+  const [englishResults, greekResults] = await Promise.all([
+    Promise.all(englishFetches),
+    Promise.all(greekFetches),
+  ]);
+
+  // 5. Build verses array, trimming trailing 404s (we overshoot last verse
+  //    to cover chapter-end edge cases)
+  interface VerseOut {
+    num:     number;
+    english: string | null;
+    greek:   string | null;
+  }
+
+  const verses: VerseOut[] = verseNumbers.map((num, i) => ({
+    num,
+    english: englishResults[i],
+    greek:   greekResults[i],
+  }));
+
+  // Trim trailing verses that are null in both languages (past chapter end)
+  while (
+    verses.length > 0 &&
+    verses[verses.length - 1].english === null &&
+    verses[verses.length - 1].greek === null
+  ) {
+    verses.pop();
+  }
+
+  if (verses.length === 0) {
     return NextResponse.json(
-      {
-        ref: cached.reference || ref,
-        text: cached.text,
-        version: versionParam,
-        copyright: COPYRIGHT[versionParam] || "",
-      },
-      { headers: { "Cache-Control": "private, max-age=900" } },
+      { error: `No verses found for ${refParam}` },
+      { status: 404 },
     );
   }
 
-  // 6. Fetch from YouVersion Platform API
-  const apiUrl = `https://api.youversion.com/v1/bibles/${bibleId}/passages/${encodeURIComponent(usfm)}`;
-  let apiRes: Response;
-
-  try {
-    apiRes = await fetch(apiUrl, {
-      headers: {
-        "X-YVP-App-Key": token,
-        Accept: "application/json",
-      },
-    });
-  } catch (err) {
-    console.error("[verse] Fetch error:", err);
+  // 6. Ensure the selected verse(s) are actually present
+  const selectedPresent = verses.some(
+    (v) => v.num >= parsed.verseStart && v.num <= parsed.verseEnd && v.english,
+  );
+  if (!selectedPresent) {
     return NextResponse.json(
-      { error: "Could not reach YouVersion API" },
-      { status: 502 },
+      { error: `Selected verse ${parsed.verseRange} not available in ${versionParam}` },
+      { status: 404 },
     );
   }
 
-  if (!apiRes.ok) {
-    const body = await apiRes.text().catch(() => "");
-    console.error(`[verse] YouVersion API returned ${apiRes.status} for ${usfm}:`, body);
-    return NextResponse.json(
-      { error: `YouVersion API error (${apiRes.status})` },
-      { status: 502 },
-    );
-  }
+  // 7. Build display reference string
+  const displayFirst = verses[0].num;
+  const displayLast  = verses[verses.length - 1].num;
+  const reference =
+    displayFirst === displayLast
+      ? `${parsed.fullBook} ${parsed.chapter}:${displayFirst}`
+      : `${parsed.fullBook} ${parsed.chapter}:${displayFirst}-${displayLast}`;
 
-  // 7. Parse response — { id, content, reference }
-  let text: string;
-  let reference: string;
-
-  try {
-    const data = await apiRes.json();
-    text = data.content || data.text || "";
-    reference = data.reference || ref;
-
-    if (!text) {
-      console.warn("[verse] Empty content from API. Full payload:", JSON.stringify(data));
-      return NextResponse.json(
-        { error: "Verse text was empty in API response" },
-        { status: 502 },
-      );
-    }
-  } catch (parseErr) {
-    console.error("[verse] JSON parse error:", parseErr);
-    return NextResponse.json(
-      { error: "Could not parse API response" },
-      { status: 502 },
-    );
-  }
-
-  // 8. Cache
-  cache.set(cacheKey, { text, reference, fetchedAt: Date.now() });
-
-  // 9. Return
   return NextResponse.json(
     {
-      ref: reference,
-      text,
-      version: versionParam,
-      copyright: COPYRIGHT[versionParam] || "",
+      reference,
+      book:             parsed.fullBook,
+      chapter:          parsed.chapter,
+      selectedStart:    parsed.verseStart,
+      selectedEnd:      parsed.verseEnd,
+      version:          versionParam,
+      versionLabel:     version.label,
+      verses,
+      copyright:        version.copyright,
+      greekAttribution: `Greek: ${GREEK_LABEL}, via YouVersion Platform API.`,
     },
     { headers: { "Cache-Control": "private, max-age=900" } },
   );
