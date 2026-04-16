@@ -1,0 +1,255 @@
+{
+  "dataset_totals": [
+    {
+      "dataset": "A",
+      "label": "Mercy, Justice & Generosity",
+      "total": 136,
+      "direct_imperatives": 79,
+      "jesus_speaker": 68,
+      "commonly_cited": 50,
+      "pct_of_abd": 35.32
+    },
+    {
+      "dataset": "B",
+      "label": "Core Gospel Doctrine",
+      "total": 149,
+      "direct_imperatives": 110,
+      "jesus_speaker": 43,
+      "commonly_cited": 79,
+      "pct_of_abd": 38.7
+    },
+    {
+      "dataset": "D",
+      "label": "Social Codes, Household & Liturgy",
+      "total": 100,
+      "direct_imperatives": 95,
+      "jesus_speaker": 10,
+      "commonly_cited": 54,
+      "pct_of_abd": 25.97
+    }
+  ],
+  "abd_total": 385,
+  "commonly_cited_total": 183,
+  "category_counts": {
+    "A14": 19,
+    "A3": 14,
+    "A1": 24,
+    "A4": 15,
+    "A13": 5,
+    "A11": 4,
+    "A2": 17,
+    "A12": 8,
+    "A6": 8,
+    "A5": 2,
+    "A10": 5,
+    "A7": 6,
+    "A8": 6,
+    "A9": 3,
+    "B1": 17,
+    "B2": 13,
+    "B3": 4,
+    "B4": 7,
+    "B5": 22,
+    "B6": 12,
+    "B7": 32,
+    "B8": 14,
+    "B9": 11,
+    "B10": 17,
+    "D1": 7,
+    "D2": 7,
+    "D13": 2,
+    "D3": 3,
+    "D4": 5,
+    "D5": 14,
+    "D6": 2,
+    "D7": 8,
+    "D8": 20,
+    "D9": 8,
+    "D10": 10,
+    "D11": 11,
+    "D12": 3
+  },
+  "speaker_breakdown": [
+    {
+      "speaker_group": "Hebrews",
+      "dataset_A": 5,
+      "dataset_B": 9,
+      "dataset_D": 4,
+      "total": 18
+    },
+    {
+      "speaker_group": "James",
+      "dataset_A": 7,
+      "dataset_B": 6,
+      "dataset_D": 4,
+      "total": 17
+    },
+    {
+      "speaker_group": "Jesus",
+      "dataset_A": 68,
+      "dataset_B": 43,
+      "dataset_D": 10,
+      "total": 121
+    },
+    {
+      "speaker_group": "John",
+      "dataset_A": 6,
+      "dataset_B": 15,
+      "dataset_D": 3,
+      "total": 24
+    },
+    {
+      "speaker_group": "John the Baptist",
+      "dataset_A": 2,
+      "dataset_B": 2,
+      "dataset_D": 0,
+      "total": 4
+    },
+    {
+      "speaker_group": "Jude",
+      "dataset_A": 1,
+      "dataset_B": 2,
+      "dataset_D": 0,
+      "total": 3
+    },
+    {
+      "speaker_group": "Other",
+      "dataset_A": 10,
+      "dataset_B": 3,
+      "dataset_D": 2,
+      "total": 15
+    },
+    {
+      "speaker_group": "Paul",
+      "dataset_A": 34,
+      "dataset_B": 54,
+      "dataset_D": 69,
+      "total": 157
+    },
+    {
+      "speaker_group": "Peter",
+      "dataset_A": 3,
+      "dataset_B": 15,
+      "dataset_D": 8,
+      "total": 26
+    }
+  ],
+  "nt_section_breakdown": [
+    {
+      "nt_section": "Gospels",
+      "dataset_A": 72,
+      "dataset_B": 44,
+      "dataset_D": 9,
+      "total": 125
+    },
+    {
+      "nt_section": "Acts",
+      "dataset_A": 7,
+      "dataset_B": 8,
+      "dataset_D": 4,
+      "total": 19
+    },
+    {
+      "nt_section": "Pauline Epistles",
+      "dataset_A": 33,
+      "dataset_B": 52,
+      "dataset_D": 69,
+      "total": 154
+    },
+    {
+      "nt_section": "General Epistles",
+      "dataset_A": 22,
+      "dataset_B": 39,
+      "dataset_D": 16,
+      "total": 77
+    },
+    {
+      "nt_section": "Revelation",
+      "dataset_A": 2,
+      "dataset_B": 6,
+      "dataset_D": 2,
+      "total": 10
+    }
+  ],
+  "key_ratios": {
+    "mercy_vs_doctrine": 0.913,
+    "mercy_vs_commonly_cited": 0.743,
+    "gospels_mercy_vs_doctrine": 1.636,
+    "jesus_mercy_pct": 0.5,
+    "jesus_doctrine_pct": 0.2886,
+    "abd_total": 385,
+    "commonly_cited_total": 183
+  },
+  "q2_summary": {
+    "CONSISTENT": 45,
+    "INCONSISTENT": 29,
+    "PARTIALLY CONSISTENT": 25,
+    "SELECTIVE": 1,
+    "unscored": 0
+  },
+  "passage_type_breakdown": [
+    {
+      "passage_type_group": "Apostolic Command",
+      "dataset_A": 0,
+      "dataset_B": 0,
+      "dataset_D": 4,
+      "total": 4
+    },
+    {
+      "passage_type_group": "Command",
+      "dataset_A": 68,
+      "dataset_B": 48,
+      "dataset_D": 1,
+      "total": 117
+    },
+    {
+      "passage_type_group": "Dominical Command",
+      "dataset_A": 0,
+      "dataset_B": 2,
+      "dataset_D": 8,
+      "total": 10
+    },
+    {
+      "passage_type_group": "Epistle Command",
+      "dataset_A": 13,
+      "dataset_B": 61,
+      "dataset_D": 84,
+      "total": 158
+    },
+    {
+      "passage_type_group": "Narrative",
+      "dataset_A": 14,
+      "dataset_B": 2,
+      "dataset_D": 0,
+      "total": 16
+    },
+    {
+      "passage_type_group": "Parable",
+      "dataset_A": 5,
+      "dataset_B": 0,
+      "dataset_D": 0,
+      "total": 5
+    },
+    {
+      "passage_type_group": "Prophecy",
+      "dataset_A": 1,
+      "dataset_B": 0,
+      "dataset_D": 0,
+      "total": 1
+    },
+    {
+      "passage_type_group": "Prophetic Command",
+      "dataset_A": 0,
+      "dataset_B": 3,
+      "dataset_D": 2,
+      "total": 5
+    },
+    {
+      "passage_type_group": "Teaching",
+      "dataset_A": 35,
+      "dataset_B": 33,
+      "dataset_D": 1,
+      "total": 69
+    }
+  ]
+}
