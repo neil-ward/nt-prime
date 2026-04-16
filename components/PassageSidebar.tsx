@@ -70,10 +70,10 @@ interface PassageSidebarProps {
 // ---------------------------------------------------------------------------
 
 function PassageRow({ p, dsFg }: { p: NTRecord; dsFg: string }) {
-  const url      = makeYouVersionUrl(p.book, p.chapter, p.verse_range);
+  const { openVerse, version } = useVerse();
+  const url      = makeYouVersionUrl(p.book, p.chapter, p.verse_range, version);
   const strength = p.command_strength_group ? STRENGTH_STYLE[p.command_strength_group] : null;
   const q2       = p.q2_consistency_rating  ? Q2_STYLE[p.q2_consistency_rating]        : null;
-  const { openVerse } = useVerse();
 
   return (
     <li className="px-4 py-3 hover:bg-stone-100/70 transition-colors">
@@ -97,7 +97,7 @@ function PassageRow({ p, dsFg }: { p: NTRecord; dsFg: string }) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            title="Open ESV in YouVersion"
+            title={`Open ${version} in YouVersion`}
             className="flex-none text-[10px] font-medium px-1.5 py-px rounded border transition-opacity hover:opacity-70 shrink-0"
             style={{ borderColor: dsFg + "33", color: dsFg + "bb" }}
             onClick={() => track("verse_link_click", { ref: p.ref, dataset: p.dataset })}
@@ -297,10 +297,11 @@ export default function PassageSidebar({ selection, records, onClearSelection }:
 // Shared footer
 // ---------------------------------------------------------------------------
 function SidebarFooter() {
+  const { version } = useVerse();
   return (
     <div className="flex-none px-4 py-2.5 border-t border-stone-200 bg-stone-100/80">
       <p className="text-[10px] text-stone-400">
-        ↗ opens <span className="font-medium text-stone-500">ESV</span> in{" "}
+        ↗ opens <span className="font-medium text-stone-500">{version}</span> in{" "}
         <a href="https://www.bible.com" target="_blank" rel="noopener noreferrer"
           className="text-stone-500 hover:text-stone-700 underline underline-offset-2">
           YouVersion

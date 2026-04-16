@@ -46,8 +46,10 @@ export const BOOK_TO_USFM: Record<string, string> = {
 // ---------------------------------------------------------------------------
 // Supported translations — each ID works for BOTH the Platform API
 // (api.youversion.com) AND bible.com deep links.
-// ESV is intentionally NOT included: it isn't available via the Platform API
-// (Crossway licensing), and we want the deep link and modal text to match.
+// Some translations require accepting their license agreement in the
+// YouVersion developer portal before the API returns content (403 otherwise).
+// Examples: NLT requires Tyndale's agreement. ESV is intentionally omitted
+// because it isn't available via the Platform API at all (Crossway licensing).
 // ---------------------------------------------------------------------------
 
 export interface VersionSpec {
@@ -62,6 +64,12 @@ export const VERSIONS: Record<string, VersionSpec> = {
     label: "New International Version",
     copyright:
       "Scripture quotations taken from the Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™",
+  },
+  NLT: {
+    id: 116,
+    label: "New Living Translation",
+    copyright:
+      "Scripture quotations taken from the Holy Bible, New Living Translation, copyright © 1996, 2004, 2015 by Tyndale House Foundation. Used by permission of Tyndale House Publishers, Carol Stream, Illinois 60188. All rights reserved.",
   },
   NASB2020: {
     id: 2692,

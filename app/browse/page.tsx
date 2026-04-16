@@ -46,12 +46,12 @@ const STRENGTH_GROUPS = [
 // ---------------------------------------------------------------------------
 
 function PassageRow({ p }: { p: NTRecord }) {
-  const url      = makeYouVersionUrl(p.book, p.chapter, p.verse_range);
+  const { openVerse, version } = useVerse();
+  const url      = makeYouVersionUrl(p.book, p.chapter, p.verse_range, version);
   const dsFg     = DATASET_COLORS[p.dataset];
   const dsBg     = DATASET_COLORS_LIGHT[p.dataset];
   const strength = p.command_strength_group ? STRENGTH_STYLE[p.command_strength_group] : null;
   const q2       = p.q2_consistency_rating   ? Q2_STYLE[p.q2_consistency_rating]        : null;
-  const { openVerse } = useVerse();
 
   return (
     <li className="flex gap-4 px-5 py-3.5 hover:bg-stone-100/60 transition-colors border-b border-stone-200/50 last:border-0">
@@ -129,7 +129,7 @@ function PassageRow({ p }: { p: NTRecord }) {
           <a
             href={url} target="_blank" rel="noopener noreferrer"
             className="text-[10px] font-medium text-stone-400 hover:text-stone-600 transition-colors"
-            title="Open ESV in YouVersion"
+            title={`Open ${version} in YouVersion`}
           >
             ↗
           </a>

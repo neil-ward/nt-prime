@@ -50,9 +50,16 @@ function cacheKey(bibleId: number, usfm: string) {
   return `${bibleId}:${usfm}`;
 }
 
+/** Sentinel thrown when a Bible version is denied (not licensed on this key). */
+class AccessDeniedError extends Error {
+  constructor(public bibleId: number) {
+    super(`Access denied for bible ${bibleId}`);
+  }
+}
+
 /**
  * Fetch a single verse from the YouVersion Platform API.
- * Returns null on 404. Throws on other errors.
+ * Returns null on 404. Throws AccessDeniedError on 403. Throws on other errors.
  */
 async function fetchVerse(
   bibleId: number,
@@ -73,6 +80,10 @@ async function fetchVerse(
   if (res.status === 404) {
     cache.set(key, { text: null, fetchedAt: Date.now() });
     return null;
+  }
+
+  if (res.status === 403) {
+    throw new AccessDeniedError(bibleId);
   }
 
   if (!res.ok) {
@@ -158,6 +169,25 @@ export async function GET(request: NextRequest) {
   // 4. Build USFM ids for every verse in the range
   const verseNumbers: number[] = [];
   for (let v = first; v <= last; v++) verseNumbers.push(v);
+
+  // If the English version isn't licensed for this API key, the first fetch
+  // will throw AccessDeniedError. Do a single probe fetch first to surface a
+  // clean error rather than drowning it in Promise.all results.
+  try {
+    await fetchVerse(version.id, `${parsed.usfmBook}.${parsed.chapter}.${parsed.verseStart}`, token);
+  } catch (err) {
+    if (err instanceof AccessDeniedError) {
+      return NextResponse.json(
+        {
+          error: `This translation (${versionParam}) isn't enabled on your YouVersion developer key. Open https://developers.youversion.com/ and accept the license agreement for ${versionParam}, then try again.`,
+          code: "version_not_licensed",
+          version: versionParam,
+        },
+        { status: 403 },
+      );
+    }
+    // fall through for other errors — handled below
+  }
 
   const englishFetches = verseNumbers.map((n) =>
     fetchVerse(version.id, `${parsed.usfmBook}.${parsed.chapter}.${n}`, token)

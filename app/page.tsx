@@ -1,4 +1,5 @@
 import Link from "next/link";
+import VersionPicker from "@/components/VersionPicker";
 
 const DATASETS = [
   {
@@ -69,6 +70,19 @@ export default function HomePage() {
             Browse all passages
           </Link>
         </div>
+      </section>
+
+      {/* Version selector */}
+      <section className="border-t border-stone-200 px-6 lg:px-20 py-10 max-w-5xl mx-auto w-full">
+        <div className="flex items-baseline gap-4 mb-5 flex-wrap">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400">
+            Your Bible Translation
+          </p>
+          <p className="text-[11px] text-stone-500">
+            Select the translation used for verse text and deep links
+          </p>
+        </div>
+        <VersionPicker />
       </section>
 
       {/* Dataset cards */}
