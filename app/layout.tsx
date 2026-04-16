@@ -4,6 +4,7 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
 import VerseProvider from "@/components/VerseProvider";
+import FeedbackWidget from "@/components/FeedbackWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,6 +44,7 @@ export default function RootLayout({
         <AnalyticsProvider>
           <VerseProvider>
             <div className="flex flex-col flex-1">{children}</div>
+            <FeedbackWidget />
           </VerseProvider>
         </AnalyticsProvider>
       </body>
