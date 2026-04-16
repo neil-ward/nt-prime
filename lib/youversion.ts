@@ -52,10 +52,13 @@ export const BOOK_TO_USFM: Record<string, string> = {
 // because it isn't available via the Platform API at all (Crossway licensing).
 // ---------------------------------------------------------------------------
 
+export type VerseProvider = "youversion" | "esv" | "nlt";
+
 export interface VersionSpec {
-  id:        number;
+  id:        number;          // bible.com ID — used for ↗ deep links
   label:     string;
   copyright: string;
+  provider:  VerseProvider;   // which upstream API serves the text
 }
 
 export const VERSIONS: Record<string, VersionSpec> = {
@@ -64,46 +67,61 @@ export const VERSIONS: Record<string, VersionSpec> = {
     label: "New International Version",
     copyright:
       "Scripture quotations taken from the Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™",
+    provider: "youversion",
+  },
+  ESV: {
+    id: 59,
+    label: "English Standard Version",
+    copyright:
+      "Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    provider: "esv",
   },
   NLT: {
     id: 116,
     label: "New Living Translation",
     copyright:
       "Scripture quotations taken from the Holy Bible, New Living Translation, copyright © 1996, 2004, 2015 by Tyndale House Foundation. Used by permission of Tyndale House Publishers, Carol Stream, Illinois 60188. All rights reserved.",
+    provider: "nlt",
   },
   NASB2020: {
     id: 2692,
     label: "New American Standard Bible 2020",
     copyright:
       "Scripture quotations taken from the (NASB®) New American Standard Bible®, Copyright © 2020 by The Lockman Foundation. Used by permission.",
+    provider: "youversion",
   },
   NASB1995: {
     id: 100,
     label: "New American Standard Bible 1995",
     copyright:
       "Scripture quotations taken from the New American Standard Bible® (NASB), Copyright © 1960, 1971, 1977, 1995 by The Lockman Foundation. Used by permission.",
+    provider: "youversion",
   },
   BSB: {
     id: 3034,
     label: "Berean Standard Bible",
     copyright: "The Holy Bible, Berean Standard Bible, BSB. Public domain.",
+    provider: "youversion",
   },
   AMP: {
     id: 1588,
     label: "Amplified Bible",
     copyright:
       "Scripture quotations taken from the Amplified® Bible (AMP), Copyright © 2015 by The Lockman Foundation. Used by permission.",
+    provider: "youversion",
   },
   ASV: {
     id: 12,
     label: "American Standard Version",
     copyright: "American Standard Version. Public domain.",
+    provider: "youversion",
   },
   LSV: {
     id: 2660,
     label: "Literal Standard Version",
     copyright:
       "Scripture quotations taken from the Literal Standard Version (LSV). Copyright © 2020 Covenant Press.",
+    provider: "youversion",
   },
 };
 

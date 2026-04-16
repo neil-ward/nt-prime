@@ -8,21 +8,16 @@
 //
 // Returns:
 //   {
-//     reference:     "Matthew 5:38-46",
-//     book:          "Matthew",
-//     chapter:       5,
-//     selectedStart: 42,
-//     selectedEnd:   42,
-//     version:       "NIV",
-//     verses:        [ { num, english, greek } ],
-//     copyright:     "…",
-//     greekAttribution: "…"
+//     reference, book, chapter, selectedStart, selectedEnd,
+//     version, versionLabel,
+//     verses:  [ { num, english, greek } ],
+//     copyright, greekAttribution
 //   }
 //
-// Implementation notes:
-//   - N parallel YouVersion fetches (2 per verse: English + Greek).
-//   - Per-verse in-memory cache keyed (bibleId, usfm) for 15 min.
-//   - Gracefully handles 404s (past chapter end, or Greek missing).
+// Dispatch:
+//   - VERSIONS[key].provider selects which adapter serves the English text:
+//     "youversion" | "esv" | "nlt"
+//   - Greek always comes from YouVersion (bibleId 3428)
 // ---------------------------------------------------------------------------
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -33,123 +28,31 @@ import {
   GREEK_LABEL,
   type VersionKey,
 } from "@/lib/youversion";
-
-// ---------------------------------------------------------------------------
-// Per-verse in-memory cache
-// ---------------------------------------------------------------------------
-
-interface CacheEntry {
-  text:      string | null;   // null means 404 (caches negative results)
-  fetchedAt: number;
-}
-
-const cache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 15 * 60 * 1000;
-
-function cacheKey(bibleId: number, usfm: string) {
-  return `${bibleId}:${usfm}`;
-}
-
-/** Sentinel thrown when a Bible version is denied (not licensed on this key). */
-class AccessDeniedError extends Error {
-  constructor(public bibleId: number) {
-    super(`Access denied for bible ${bibleId}`);
-  }
-}
-
-/**
- * Fetch a single verse from the YouVersion Platform API.
- * Returns null on 404. Throws AccessDeniedError on 403. Throws on other errors.
- */
-async function fetchVerse(
-  bibleId: number,
-  usfm: string,
-  token: string,
-): Promise<string | null> {
-  const key = cacheKey(bibleId, usfm);
-  const cached = cache.get(key);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return cached.text;
-  }
-
-  const url = `https://api.youversion.com/v1/bibles/${bibleId}/passages/${encodeURIComponent(usfm)}`;
-  const res = await fetch(url, {
-    headers: { "X-YVP-App-Key": token, Accept: "application/json" },
-  });
-
-  if (res.status === 404) {
-    cache.set(key, { text: null, fetchedAt: Date.now() });
-    return null;
-  }
-
-  if (res.status === 403) {
-    throw new AccessDeniedError(bibleId);
-  }
-
-  if (!res.ok) {
-    throw new Error(`YouVersion API ${res.status} for ${usfm}`);
-  }
-
-  const data = await res.json();
-  const text = (data.content || data.text || "").trim();
-  cache.set(key, { text, fetchedAt: Date.now() });
-  return text || null;
-}
-
-// ---------------------------------------------------------------------------
-// Range expansion — pericope heuristic (±context verses)
-// ---------------------------------------------------------------------------
-
-function expandRange(
-  chapter: number,
-  selStart: number,
-  selEnd: number,
-  context: number,
-): { first: number; last: number } {
-  // Lower bound: selected start - context, but never below 1
-  const first = Math.max(1, selStart - context);
-  // Upper bound: selected end + context. We don't know chapter length up
-  // front — we'll stop at the first 404 when fetching.
-  const last  = selEnd + context;
-  void chapter;
-  return { first, last };
-}
-
-// ---------------------------------------------------------------------------
-// Handler
-// ---------------------------------------------------------------------------
+import { AccessDeniedError } from "@/lib/verse-providers/shared";
+import * as Yv  from "@/lib/verse-providers/youversion";
+import * as Esv from "@/lib/verse-providers/esv";
+import * as Nlt from "@/lib/verse-providers/nlt";
 
 export async function GET(request: NextRequest) {
-  const token = process.env.YOUVERSION_API_TOKEN;
-  if (!token) {
-    return NextResponse.json(
-      { error: "Verse text not configured — set YOUVERSION_API_TOKEN" },
-      { status: 503 },
-    );
-  }
-
   const { searchParams } = request.nextUrl;
   const refParam     = searchParams.get("ref");
   const versionParam = (searchParams.get("version") || "NIV").toUpperCase() as VersionKey;
-  const contextParam = Math.max(0, Math.min(10, parseInt(searchParams.get("context") || "4", 10) || 4));
+  const contextParam = Math.max(
+    0,
+    Math.min(10, parseInt(searchParams.get("context") || "4", 10) || 4),
+  );
 
   if (!refParam) {
-    return NextResponse.json(
-      { error: "Missing required query parameter: ref" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Missing required query parameter: ref" }, { status: 400 });
   }
 
-  // 1. Parse the ref
+  // Parse ref
   const parsed = parseRef(refParam);
   if (!parsed) {
-    return NextResponse.json(
-      { error: `Could not parse ref: "${refParam}"` },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: `Could not parse ref: "${refParam}"` }, { status: 400 });
   }
 
-  // 2. Resolve version
+  // Resolve version
   const version = VERSIONS[versionParam];
   if (!version) {
     return NextResponse.json(
@@ -158,82 +61,58 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 3. Compute range
-  const { first, last } = expandRange(
-    parsed.chapter,
-    parsed.verseStart,
-    parsed.verseEnd,
-    contextParam,
-  );
+  // Compute context range (±contextParam around the selected range)
+  const first = Math.max(1, parsed.verseStart - contextParam);
+  const last  = parsed.verseEnd + contextParam;
 
-  // 4. Build USFM ids for every verse in the range
-  const verseNumbers: number[] = [];
-  for (let v = first; v <= last; v++) verseNumbers.push(v);
+  // English + Greek in parallel
+  let englishMap: Map<number, string | null>;
+  let greekMap:   Map<number, string | null>;
 
-  // If the English version isn't licensed for this API key, the first fetch
-  // will throw AccessDeniedError. Do a single probe fetch first to surface a
-  // clean error rather than drowning it in Promise.all results.
   try {
-    await fetchVerse(version.id, `${parsed.usfmBook}.${parsed.chapter}.${parsed.verseStart}`, token);
+    [englishMap, greekMap] = await Promise.all([
+      dispatchEnglish(version.provider, version.id, parsed.fullBook, parsed.usfmBook, parsed.chapter, first, last),
+      Yv.fetchRange(GREEK_BIBLE_ID, parsed.usfmBook, parsed.chapter, first, last).catch(() => new Map()),
+    ]);
   } catch (err) {
     if (err instanceof AccessDeniedError) {
       return NextResponse.json(
         {
-          error: `This translation (${versionParam}) isn't enabled on your YouVersion developer key. Open https://developers.youversion.com/ and accept the license agreement for ${versionParam}, then try again.`,
-          code: "version_not_licensed",
+          error: `Verse text provider (${err.provider}) denied access. Check that the key is valid and, if required, that the translation's license agreement has been accepted.`,
+          code:  "provider_access_denied",
           version: versionParam,
         },
         { status: 403 },
       );
     }
-    // fall through for other errors — handled below
+    if (err instanceof Error && err.message.includes("not configured")) {
+      return NextResponse.json(
+        { error: err.message, code: "not_configured" },
+        { status: 503 },
+      );
+    }
+    console.error("[verse] Unhandled error:", err);
+    return NextResponse.json({ error: "Could not fetch verse text" }, { status: 502 });
   }
 
-  const englishFetches = verseNumbers.map((n) =>
-    fetchVerse(version.id, `${parsed.usfmBook}.${parsed.chapter}.${n}`, token)
-      .catch(() => null),
-  );
-  const greekFetches = verseNumbers.map((n) =>
-    fetchVerse(GREEK_BIBLE_ID, `${parsed.usfmBook}.${parsed.chapter}.${n}`, token)
-      .catch(() => null),
-  );
-
-  const [englishResults, greekResults] = await Promise.all([
-    Promise.all(englishFetches),
-    Promise.all(greekFetches),
-  ]);
-
-  // 5. Build verses array, trimming trailing 404s (we overshoot last verse
-  //    to cover chapter-end edge cases)
-  interface VerseOut {
-    num:     number;
-    english: string | null;
-    greek:   string | null;
+  // Build the verse list; trim trailing null-in-both entries (past chapter end)
+  interface VerseOut { num: number; english: string | null; greek: string | null; }
+  const verses: VerseOut[] = [];
+  for (let n = first; n <= last; n++) {
+    verses.push({
+      num:     n,
+      english: englishMap.get(n) ?? null,
+      greek:   greekMap.get(n) ?? null,
+    });
   }
-
-  const verses: VerseOut[] = verseNumbers.map((num, i) => ({
-    num,
-    english: englishResults[i],
-    greek:   greekResults[i],
-  }));
-
-  // Trim trailing verses that are null in both languages (past chapter end)
-  while (
-    verses.length > 0 &&
-    verses[verses.length - 1].english === null &&
-    verses[verses.length - 1].greek === null
-  ) {
+  while (verses.length && verses[verses.length - 1].english === null && verses[verses.length - 1].greek === null) {
     verses.pop();
   }
 
-  if (verses.length === 0) {
-    return NextResponse.json(
-      { error: `No verses found for ${refParam}` },
-      { status: 404 },
-    );
+  if (!verses.length) {
+    return NextResponse.json({ error: `No verses found for ${refParam}` }, { status: 404 });
   }
 
-  // 6. Ensure the selected verse(s) are actually present
   const selectedPresent = verses.some(
     (v) => v.num >= parsed.verseStart && v.num <= parsed.verseEnd && v.english,
   );
@@ -244,7 +123,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 7. Build display reference string
   const displayFirst = verses[0].num;
   const displayLast  = verses[verses.length - 1].num;
   const reference =
@@ -267,4 +145,28 @@ export async function GET(request: NextRequest) {
     },
     { headers: { "Cache-Control": "private, max-age=900" } },
   );
+}
+
+/** Route the English-text fetch to the configured provider. */
+function dispatchEnglish(
+  provider: "youversion" | "esv" | "nlt",
+  bibleId:  number,
+  fullBook: string,  // "Matthew", "1 Corinthians"
+  usfmBook: string,  // "MAT", "1CO"
+  chapter:  number,
+  first:    number,
+  last:     number,
+): Promise<Map<number, string | null>> {
+  switch (provider) {
+    case "youversion":
+      return Yv.fetchRange(bibleId, usfmBook, chapter, first, last);
+    case "esv":
+      return Esv.fetchRange(bibleId, fullBook, chapter, first, last);
+    case "nlt":
+      return Nlt.fetchRange(bibleId, fullBook, chapter, first, last);
+    default: {
+      const _exhaustive: never = provider;
+      throw new Error(`Unknown provider: ${_exhaustive}`);
+    }
+  }
 }
