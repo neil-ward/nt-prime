@@ -61,7 +61,7 @@ function recordXY(r: NTRecord): [number, number] {
 // ---------------------------------------------------------------------------
 // Deterministic jitter
 // Records sharing the same (x,y) bucket are arranged in a compact grid
-// centred at the scaled position.
+// centered at the scaled position.
 // ---------------------------------------------------------------------------
 
 const SPACING = 17; // px between dots in the same bucket
@@ -93,7 +93,7 @@ function buildPositions(
     recs.forEach((r, i) => {
       const row    = Math.floor(i / cols);
       const col    = i % cols;
-      // Centre the grid within the bucket
+      // Center the grid within the bucket
       const rowLen  = row === rows - 1 ? n - row * cols : cols;
       const offsetX = (col - (rowLen - 1) / 2) * SPACING;
       const offsetY = (row - (rows   - 1) / 2) * SPACING;

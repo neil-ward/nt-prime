@@ -195,7 +195,7 @@ export default function AnalyticsPage() {
               <VizSection
                 num="01"
                 title="When are users active?"
-                subtitle="Hour-of-day by day-of-week heatmap. Warmer colours indicate more events in that time slot."
+                subtitle="Hour-of-day by day-of-week heatmap. Warmer colors indicate more events in that time slot."
               >
                 <ActivityHeatmap data={data!.heatmap} />
               </VizSection>

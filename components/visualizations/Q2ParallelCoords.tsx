@@ -56,7 +56,7 @@ const RATING_LABEL: Record<Rating, string> = {
   "INCONSISTENT":         "Inconsistent",
 };
 
-// Score → normalised 0-1 value for Y-positioning
+// Score → normalized 0-1 value for Y-positioning
 const SCORE_Y: Record<string, number> = { Y: 1, P: 0.5, N: 0 };
 
 const MARGIN = { top: 52, right: 24, bottom: 32, left: 24 };

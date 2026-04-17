@@ -5,7 +5,7 @@
  *
  * X axis: 24 hours (0-23).
  * Y axis: 7 days of the week (Sun-Sat).
- * Cell colour intensity: d3.scaleSequential(d3.interpolateYlOrRd) mapped
+ * Cell color intensity: d3.scaleSequential(d3.interpolateYlOrRd) mapped
  * to the event count for that (dow, hour) bucket.
  *
  * Hover shows day name, hour range (e.g. "2 pm -- 3 pm"), and count.

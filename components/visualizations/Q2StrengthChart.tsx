@@ -55,7 +55,7 @@ const STRENGTH_DESC: Record<string, string> = {
   "Implicit Command":   "Strong implication without imperative",
   "Implied Command":    "Inferrable from context",
   "Warning":            "Framed as prohibition or caution",
-  "Narrative Example":  "Commanded behavior modelled in story",
+  "Narrative Example":  "Commanded behavior modeled in story",
 };
 
 // ---------------------------------------------------------------------------

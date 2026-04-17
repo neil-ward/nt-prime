@@ -134,7 +134,7 @@ export const DEFAULT_VERSION: VersionKey = "NIV";
  * Greek New Testament — modern critical text.
  * Served via the same Platform API; no separate licensing needed.
  * ID 3428 = "The Text-Critical English New Testament" (grcTCGNT)
- *   actually resolves to the Greek text at this ID in the API catalogue.
+ *   actually resolves to the Greek text at this ID in the API catalog.
  */
 export const GREEK_BIBLE_ID = 3428;
 export const GREEK_LABEL    = "Text-Critical Greek New Testament";

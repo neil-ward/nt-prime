@@ -4,7 +4,7 @@
  * DatasetInterestChart -- grouped bar chart showing event types per dataset.
  *
  * One group per dataset (A, B, D), with bars for each event_type within
- * that group. Dataset colours follow the existing palette:
+ * that group. Dataset colors follow the existing palette:
  *   A = #2a9d8f, B = #457b9d, D = #e76f51
  */
 

@@ -85,7 +85,7 @@ function PassagePanel({
   onClose: () => void;
 }) {
   const { openVerse } = useVerse();
-  // Extract dataset from first record for accent colour, or use neutral
+  // Extract dataset from first record for accent color, or use neutral
   const accentDs = records[0]?.dataset;
   const accentColor = accentDs ? DATASET_COLORS[accentDs] : "#78716c";
 

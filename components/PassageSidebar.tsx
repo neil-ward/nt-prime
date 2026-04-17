@@ -27,7 +27,7 @@ import { track } from "@/lib/analytics";
 import { useVerse } from "@/components/VerseProvider";
 
 // ---------------------------------------------------------------------------
-// Tag colour maps
+// Tag color maps
 // ---------------------------------------------------------------------------
 
 const STRENGTH_STYLE: Record<string, { bg: string; fg: string }> = {

@@ -42,7 +42,7 @@ const DIMS = [
   },
   {
     key: "q2_uca", short: "UCA", long: "Used in Church Accountability",
-    desc: "Is the command invoked when addressing member behaviour, exercising church discipline, or holding leaders to account?",
+    desc: "Is the command invoked when addressing member behavior, exercising church discipline, or holding leaders to account?",
     yLabel: "Cited in accountability or discipline processes",
     nLabel: "Not used as a basis for accountability",
   },
@@ -54,8 +54,8 @@ const DIMS = [
   },
   {
     key: "q2_mca", short: "MCA", long: "Ministerial / Cultural Acceptance",
-    desc: "Is compliance with the command broadly expected and modelled by ministry leaders, or treated as optional within ministerial culture?",
-    yLabel: "Expected and modelled by ministry leadership",
+    desc: "Is compliance with the command broadly expected and modeled by ministry leaders, or treated as optional within ministerial culture?",
+    yLabel: "Expected and modeled by ministry leadership",
     nLabel: "Treated as optional or culturally awkward",
   },
 ];
