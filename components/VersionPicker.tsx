@@ -45,10 +45,6 @@ export default function VersionPicker() {
         <span className="font-medium text-stone-500">↗</span> YouVersion deep
         links. Change anytime — your choice is saved in your browser.
       </p>
-      <p className="text-[10px] text-stone-400 mt-1 italic">
-        NLT requires accepting Tyndale&rsquo;s license agreement on your YouVersion
-        developer portal before verse text will load.
-      </p>
     </div>
   );
 }

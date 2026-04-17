@@ -51,6 +51,12 @@ export default function HomePage() {
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
+            href="/about"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded border border-stone-300 text-stone-600 text-sm font-medium hover:border-stone-400 hover:text-stone-900 transition-colors"
+          >
+            About this research
+          </Link>
+          <Link
             href="/compare"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded bg-stone-900 text-white text-sm font-medium hover:bg-stone-700 transition-colors"
           >
@@ -70,19 +76,6 @@ export default function HomePage() {
             Browse all passages
           </Link>
         </div>
-      </section>
-
-      {/* Version selector */}
-      <section className="border-t border-stone-200 px-6 lg:px-20 py-10 max-w-5xl mx-auto w-full">
-        <div className="flex items-baseline gap-4 mb-5 flex-wrap">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400">
-            Your Bible Translation
-          </p>
-          <p className="text-[11px] text-stone-500">
-            Select the translation used for verse text and deep links
-          </p>
-        </div>
-        <VersionPicker />
       </section>
 
       {/* Dataset cards */}
@@ -120,6 +113,19 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Version selector */}
+      <section className="border-t border-stone-200 px-6 lg:px-20 py-10 max-w-5xl mx-auto w-full">
+        <div className="flex items-baseline gap-4 mb-5 flex-wrap">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400">
+            Your Bible Translation
+          </p>
+          <p className="text-[11px] text-stone-500">
+            Select the translation used for verse text and deep links
+          </p>
+        </div>
+        <VersionPicker />
       </section>
 
     </main>
