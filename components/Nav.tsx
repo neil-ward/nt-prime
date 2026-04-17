@@ -7,7 +7,6 @@ const LINKS = [
   { href: "/",        label: "Home"    },
   { href: "/compare", label: "Compare" },
   { href: "/explore", label: "Explore" },
-  { href: "/q2",      label: "Q2"      },
   { href: "/browse",  label: "Browse"  },
   { href: "/about",      label: "About"     },
   { href: "/analytics", label: "Analytics" },

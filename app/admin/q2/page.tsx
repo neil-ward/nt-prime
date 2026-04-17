@@ -12,6 +12,7 @@ import Q2ParallelCoords from "@/components/visualizations/Q2ParallelCoords";
 import Q2UnitGrid from "@/components/visualizations/Q2UnitGrid";
 import Q2StrengthChart from "@/components/visualizations/Q2StrengthChart";
 import Q2CitationParadox from "@/components/visualizations/Q2CitationParadox";
+import AdminGate from "@/components/AdminGate";
 
 // ---------------------------------------------------------------------------
 // Shared palette
@@ -296,7 +297,7 @@ function RecordMatrix({ records }: { records: NTRecord[] }) {
                     className="border-b border-stone-100 hover:bg-stone-50 transition-colors cursor-pointer"
                     style={{ backgroundColor: rowBg }}
                     onClick={() => {
-                      if (!isExpanded) track("record_expand", { ref: r.ref, dataset: r.dataset, page: "/q2" });
+                      if (!isExpanded) track("record_expand", { ref: r.ref, dataset: r.dataset, page: "/admin/q2" });
                       setExpandedKey(isExpanded ? null : rowKey);
                     }}
                   >
@@ -474,6 +475,17 @@ function RecordGroup({ rating, records }: { rating: Rating; records: NTRecord[] 
 // ---------------------------------------------------------------------------
 
 export default function Q2Page() {
+  return (
+    <AdminGate
+      title="Q2 Review"
+      subtitle="This dataset is under review and not yet public. Enter the admin token to continue."
+    >
+      <Q2PageContent />
+    </AdminGate>
+  );
+}
+
+function Q2PageContent() {
   const [records, setRecords] = useState<NTRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
@@ -540,6 +552,56 @@ export default function Q2Page() {
           {RATINGS.map((r) => (
             <StatCard key={r} rating={r} count={ratingCounts[r]} total={total} />
           ))}
+        </div>
+
+        {/* ── Sortable record matrix ── */}
+        <div className="py-8 border-b border-stone-200">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-1">
+            All records · dimension matrix
+          </p>
+          <p className="text-sm text-stone-500 leading-relaxed mb-6 max-w-2xl">
+            Every Dataset D record with its five dimension scores. Sort by any
+            column to surface structural patterns — the IC column in particular
+            reveals where institutional consistency breaks down.
+          </p>
+
+          {/* Dimension definition cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-6">
+            {DIMS.map((dim) => (
+              <div
+                key={dim.key}
+                className="rounded-md border border-stone-200 bg-white px-3 py-3"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 tracking-wide">
+                    {dim.short}
+                  </span>
+                </div>
+                <p className="text-[11px] font-semibold text-stone-700 leading-snug mb-1.5">
+                  {dim.long}
+                </p>
+                <p className="text-[10px] text-stone-500 leading-relaxed mb-2">
+                  {dim.desc}
+                </p>
+                <div className="space-y-0.5 border-t border-stone-100 pt-2">
+                  <div className="flex items-start gap-1.5">
+                    <span className="w-2 h-2 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: "#7fbf9e" }} />
+                    <span className="text-[9px] text-stone-400 leading-tight">{dim.yLabel}</span>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <span className="w-2 h-2 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: "#d06060" }} />
+                    <span className="text-[9px] text-stone-400 leading-tight">{dim.nLabel}</span>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <span className="w-2 h-2 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: "#f0c040" }} />
+                    <span className="text-[9px] text-stone-400 leading-tight">P = partially or inconsistently so</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <RecordMatrix records={dRecords} />
         </div>
 
         {/* ── Unit grid ── */}
@@ -677,56 +739,6 @@ export default function Q2Page() {
             type and social standing.
           </p>
           <CategoryChart records={dRecords} />
-        </div>
-
-        {/* ── Sortable record matrix ── */}
-        <div className="py-8 border-b border-stone-200">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-1">
-            All records · dimension matrix
-          </p>
-          <p className="text-sm text-stone-500 leading-relaxed mb-6 max-w-2xl">
-            Every Dataset D record with its five dimension scores. Sort by any
-            column to surface structural patterns — the IC column in particular
-            reveals where institutional consistency breaks down.
-          </p>
-
-          {/* Dimension definition cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-6">
-            {DIMS.map((dim) => (
-              <div
-                key={dim.key}
-                className="rounded-md border border-stone-200 bg-white px-3 py-3"
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 tracking-wide">
-                    {dim.short}
-                  </span>
-                </div>
-                <p className="text-[11px] font-semibold text-stone-700 leading-snug mb-1.5">
-                  {dim.long}
-                </p>
-                <p className="text-[10px] text-stone-500 leading-relaxed mb-2">
-                  {dim.desc}
-                </p>
-                <div className="space-y-0.5 border-t border-stone-100 pt-2">
-                  <div className="flex items-start gap-1.5">
-                    <span className="w-2 h-2 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: "#7fbf9e" }} />
-                    <span className="text-[9px] text-stone-400 leading-tight">{dim.yLabel}</span>
-                  </div>
-                  <div className="flex items-start gap-1.5">
-                    <span className="w-2 h-2 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: "#d06060" }} />
-                    <span className="text-[9px] text-stone-400 leading-tight">{dim.nLabel}</span>
-                  </div>
-                  <div className="flex items-start gap-1.5">
-                    <span className="w-2 h-2 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: "#f0c040" }} />
-                    <span className="text-[9px] text-stone-400 leading-tight">P = partially or inconsistently so</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <RecordMatrix records={dRecords} />
         </div>
 
         {/* ── Records by rating ── */}
