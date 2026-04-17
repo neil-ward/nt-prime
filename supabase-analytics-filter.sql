@@ -1,57 +1,27 @@
 -- ==========================================================================
--- NT Prime Analytics — Supabase Setup Script
+-- NT Prime — Analytics filter update
 --
--- Run this in the Supabase SQL Editor (Dashboard → SQL Editor → New Query).
--- It creates the events table, indexes, RLS policies, and five analytics
--- functions that the /api/analytics route calls.
--- ==========================================================================
-
--- 1. Events table
-CREATE TABLE IF NOT EXISTS events (
-  id         BIGSERIAL    PRIMARY KEY,
-  event_type TEXT         NOT NULL,
-  ref        TEXT,
-  dataset    TEXT,
-  page       TEXT,
-  metadata   JSONB        DEFAULT '{}',
-  session_id TEXT         NOT NULL,
-  created_at TIMESTAMPTZ  DEFAULT NOW()
-);
-
--- 2. Indexes for fast analytics queries
-CREATE INDEX IF NOT EXISTS idx_events_type    ON events(event_type);
-CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
-CREATE INDEX IF NOT EXISTS idx_events_ref     ON events(ref);
-CREATE INDEX IF NOT EXISTS idx_events_page    ON events(page);
-
--- 3. Row Level Security
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-
--- Service role can insert (used by /api/track)
-CREATE POLICY "Service role can insert events"
-  ON events FOR INSERT
-  TO service_role
-  WITH CHECK (true);
-
--- Anyone can read (analytics page is public)
-CREATE POLICY "Public can read events"
-  ON events FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
--- ==========================================================================
--- 4. Analytics aggregation functions (called via supabase.rpc())
+-- Run this ONCE in the Supabase SQL Editor to:
+--   1. Update the 5 analytics RPC functions to exclude admin/test pages
+--      (/admin/*, /analytics, /smoke, /smoke-test) so owner activity
+--      doesn't skew the public dashboard.
+--   2. Delete historical events from those same pages so the charts
+--      start clean.
 --
--- Every function applies the same admin/test-page filter so owner activity
--- doesn't skew the public dashboard:
---   page IS NULL                       -- events without a page, keep
---   OR page NOT LIKE '/admin/%'        -- exclude all /admin/* pages
---   AND page NOT IN ('/analytics',     -- exclude the analytics dashboard
---                    '/smoke',
---                    '/smoke-test')    -- exclude smoke-test paths
+-- Safe to re-run: all DDL uses CREATE OR REPLACE, and the DELETE is
+-- idempotent (further runs are no-ops once the data is gone).
 -- ==========================================================================
 
--- 4a. Activity heatmap — events by day-of-week × hour-of-day
+-- --------------------------------------------------------------------------
+-- 1. Updated RPC functions with admin/test exclusion baked in.
+--    The filter is applied identically in every function:
+--      page IS NULL                             -- events with no page, keep
+--      OR page NOT LIKE '/admin/%'              -- exclude /admin/* (all admin)
+--      AND page NOT IN ('/analytics',           -- exclude the analytics dash
+--                       '/smoke',               -- exclude smoke tests
+--                       '/smoke-test')          -- exclude smoke tests
+-- --------------------------------------------------------------------------
+
 CREATE OR REPLACE FUNCTION analytics_hourly_heatmap(cutoff_days INT DEFAULT 30)
 RETURNS TABLE(dow INT, hour INT, count BIGINT) AS $$
   SELECT EXTRACT(DOW FROM created_at)::INT AS dow,
@@ -65,7 +35,6 @@ RETURNS TABLE(dow INT, hour INT, count BIGINT) AS $$
   GROUP BY dow, hour
 $$ LANGUAGE sql STABLE;
 
--- 4b. Top verses by engagement
 CREATE OR REPLACE FUNCTION analytics_top_verses(cutoff_days INT DEFAULT 30, lim INT DEFAULT 20)
 RETURNS TABLE(ref TEXT, count BIGINT) AS $$
   SELECT ref, COUNT(*) AS count
@@ -80,7 +49,6 @@ RETURNS TABLE(ref TEXT, count BIGINT) AS $$
   LIMIT lim
 $$ LANGUAGE sql STABLE;
 
--- 4c. Dataset interest — events per dataset × event type
 CREATE OR REPLACE FUNCTION analytics_dataset_interest(cutoff_days INT DEFAULT 30)
 RETURNS TABLE(dataset TEXT, event_type TEXT, count BIGINT) AS $$
   SELECT dataset, event_type, COUNT(*) AS count
@@ -94,7 +62,6 @@ RETURNS TABLE(dataset TEXT, event_type TEXT, count BIGINT) AS $$
   ORDER BY dataset
 $$ LANGUAGE sql STABLE;
 
--- 4d. Page engagement — events per page
 CREATE OR REPLACE FUNCTION analytics_page_engagement(cutoff_days INT DEFAULT 30)
 RETURNS TABLE(page TEXT, count BIGINT) AS $$
   SELECT page, COUNT(*) AS count
@@ -107,7 +74,6 @@ RETURNS TABLE(page TEXT, count BIGINT) AS $$
   ORDER BY count DESC
 $$ LANGUAGE sql STABLE;
 
--- 4e. Daily trend — events per calendar day
 CREATE OR REPLACE FUNCTION analytics_daily_trend(cutoff_days INT DEFAULT 30)
 RETURNS TABLE(day DATE, count BIGINT) AS $$
   SELECT DATE(created_at) AS day, COUNT(*) AS count
@@ -119,3 +85,14 @@ RETURNS TABLE(day DATE, count BIGINT) AS $$
   GROUP BY day
   ORDER BY day
 $$ LANGUAGE sql STABLE;
+
+-- --------------------------------------------------------------------------
+-- 2. Purge historical events from admin/test pages.
+--    Run this once to clean up smoke-test and admin-viewing data from
+--    the earlier development/testing phase.
+-- --------------------------------------------------------------------------
+
+DELETE FROM events
+WHERE page IS NOT NULL
+  AND (page LIKE '/admin/%'
+       OR page IN ('/analytics', '/smoke', '/smoke-test'));
