@@ -1,8 +1,11 @@
 // ---------------------------------------------------------------------------
 // Data loader
-// Fetches from /data/ (public directory) on the client.
-// Both files are always fetched together and cached in module scope so
-// subsequent calls within the same session don't re-fetch.
+//
+// Records come from /api/records (backed by Supabase).
+// Aggregates come from /data/nt_aggregates.json (static derived stats).
+//
+// Both results are cached in module scope for the lifetime of the page,
+// so subsequent calls within the same session don't re-fetch.
 // ---------------------------------------------------------------------------
 
 import type { NTRecord, Aggregates } from "./types";
@@ -12,8 +15,8 @@ let _aggregates: Aggregates | null = null;
 
 export async function loadRecords(): Promise<NTRecord[]> {
   if (_records) return _records;
-  const res = await fetch("/data/nt_data.json");
-  if (!res.ok) throw new Error(`Failed to load nt_data.json: ${res.status}`);
+  const res = await fetch("/api/records");
+  if (!res.ok) throw new Error(`Failed to load records: ${res.status}`);
   _records = await res.json();
   return _records!;
 }

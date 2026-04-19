@@ -69,8 +69,21 @@ export interface NTRecord {
   summary: string;
   interpretive_notes: string;
 
+  // OT / ANE ethical root — captures the historical ethical register,
+  // which may differ from the NT dataset classification.
+  // Example: "do not move the boundary stone" is an NT-era communal-life
+  // command whose ANE root is a justice-and-mercy protection of weaker
+  // neighbors from being defrauded.
+  ot_root_category: string | null;
+  ot_root_notes:    string | null;
+
   // Emphasis tag — true if this passage is among the commonly cited passages
   commonly_cited: boolean;
+
+  // Admin metadata (present only for DB-backed records)
+  id?:         number;
+  created_at?: string;
+  updated_at?: string;
 
   // Q2 fields — only populated for Dataset D records
   q2_crg: Q2Score | null;
