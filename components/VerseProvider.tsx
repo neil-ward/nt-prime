@@ -10,6 +10,10 @@
 //
 // Usage:
 //   const { openVerse, version, setVersion } = useVerse();
+//   openVerse("Matt 5:42", { otAntecedent: "Deut 15:7-8; Prov 21:13" });
+//
+// The optional otAntecedent argument is a semicolon-separated OT ref
+// string that the modal will parse and display alongside the NT passage.
 // ---------------------------------------------------------------------------
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
@@ -21,8 +25,12 @@ import {
   type VersionKey,
 } from "@/lib/youversion";
 
+interface OpenVerseOptions {
+  otAntecedent?: string | null;
+}
+
 interface VerseContextValue {
-  openVerse:  (ref: string) => void;
+  openVerse:  (ref: string, options?: OpenVerseOptions) => void;
   closeVerse: () => void;
   version:    VersionKey;
   setVersion: (v: VersionKey) => void;
@@ -40,7 +48,8 @@ export function useVerse() {
 }
 
 export default function VerseProvider({ children }: { children: React.ReactNode }) {
-  const [activeRef, setActiveRef] = useState<string | null>(null);
+  const [activeRef,         setActiveRef]         = useState<string | null>(null);
+  const [activeAntecedent,  setActiveAntecedent]  = useState<string | null>(null);
   const [version, setVersionState] = useState<VersionKey>(DEFAULT_VERSION);
 
   // Hydrate from localStorage on mount (client-only)
@@ -48,12 +57,14 @@ export default function VerseProvider({ children }: { children: React.ReactNode 
     setVersionState(getPreferredVersion());
   }, []);
 
-  const openVerse = useCallback((ref: string) => {
+  const openVerse = useCallback((ref: string, options?: OpenVerseOptions) => {
     setActiveRef(ref);
+    setActiveAntecedent(options?.otAntecedent ?? null);
   }, []);
 
   const closeVerse = useCallback(() => {
     setActiveRef(null);
+    setActiveAntecedent(null);
   }, []);
 
   const setVersion = useCallback((v: VersionKey) => {
@@ -67,6 +78,7 @@ export default function VerseProvider({ children }: { children: React.ReactNode 
       {activeRef && (
         <VerseModal
           ref_={activeRef}
+          otAntecedent={activeAntecedent}
           version={version}
           onVersionChange={setVersion}
           onClose={closeVerse}

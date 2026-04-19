@@ -141,14 +141,14 @@ function PassageRow({ p, dsFg }: { p: NTRecord; dsFg: string }) {
       {p.summary ? (
         <p
           className="text-[11px] text-stone-500 leading-relaxed line-clamp-2 cursor-pointer hover:text-stone-800 transition-colors"
-          onClick={() => openVerse(p.ref)}
+          onClick={() => openVerse(p.ref, { otAntecedent: p.ot_antecedent })}
           title="View verse text"
         >
           {p.summary}
         </p>
       ) : (
         <button
-          onClick={() => openVerse(p.ref)}
+          onClick={() => openVerse(p.ref, { otAntecedent: p.ot_antecedent })}
           className="text-[10px] text-stone-400 hover:text-stone-600 italic transition-colors"
         >
           View verse text &rarr;

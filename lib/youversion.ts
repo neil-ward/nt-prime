@@ -12,8 +12,53 @@
 
 import { BOOK_ABBREVIATIONS } from "@/lib/constants";
 
-/** USFM book codes keyed by full English book name as it appears in nt_data.json */
+/**
+ * USFM book codes keyed by full English book name.
+ * Covers all 39 OT + 27 NT books so the verse modal can display OT
+ * antecedent passages alongside NT commands.
+ */
 export const BOOK_TO_USFM: Record<string, string> = {
+  // ── Old Testament ──
+  Genesis:         "GEN",
+  Exodus:          "EXO",
+  Leviticus:       "LEV",
+  Numbers:         "NUM",
+  Deuteronomy:     "DEU",
+  Joshua:          "JOS",
+  Judges:          "JDG",
+  Ruth:            "RUT",
+  "1 Samuel":      "1SA",
+  "2 Samuel":      "2SA",
+  "1 Kings":       "1KI",
+  "2 Kings":       "2KI",
+  "1 Chronicles":  "1CH",
+  "2 Chronicles":  "2CH",
+  Ezra:            "EZR",
+  Nehemiah:        "NEH",
+  Esther:          "EST",
+  Job:             "JOB",
+  Psalms:          "PSA",
+  Proverbs:        "PRO",
+  Ecclesiastes:    "ECC",
+  "Song of Songs": "SNG",
+  Isaiah:          "ISA",
+  Jeremiah:        "JER",
+  Lamentations:    "LAM",
+  Ezekiel:         "EZK",
+  Daniel:          "DAN",
+  Hosea:           "HOS",
+  Joel:            "JOL",
+  Amos:            "AMO",
+  Obadiah:         "OBA",
+  Jonah:           "JON",
+  Micah:           "MIC",
+  Nahum:           "NAM",
+  Habakkuk:        "HAB",
+  Zephaniah:       "ZEP",
+  Haggai:          "HAG",
+  Zechariah:       "ZEC",
+  Malachi:         "MAL",
+  // ── New Testament ──
   Matthew:           "MAT",
   Mark:              "MRK",
   Luke:              "LUK",
@@ -195,12 +240,98 @@ export function makeYouVersionUrl(
 }
 
 // ---------------------------------------------------------------------------
-// Ref parsing
+// Ref parsing — supports OT + NT
 // ---------------------------------------------------------------------------
 
+/**
+ * Abbreviations used in the ot_antecedent field for OT books.
+ * NT abbreviations come from BOOK_ABBREVIATIONS in lib/constants.ts.
+ */
+const OT_BOOK_ABBREVIATIONS: Record<string, string> = {
+  Genesis:         "Gen",
+  Exodus:          "Exod",
+  Leviticus:       "Lev",
+  Numbers:         "Num",
+  Deuteronomy:     "Deut",
+  Joshua:          "Josh",
+  Judges:          "Judg",
+  Ruth:            "Ruth",
+  "1 Samuel":      "1 Sam",
+  "2 Samuel":      "2 Sam",
+  "1 Kings":       "1 Kgs",
+  "2 Kings":       "2 Kgs",
+  "1 Chronicles":  "1 Chr",
+  "2 Chronicles":  "2 Chr",
+  Ezra:            "Ezra",
+  Nehemiah:        "Neh",
+  Esther:          "Esth",
+  Job:             "Job",
+  Psalms:          "Ps",
+  Proverbs:        "Prov",
+  Ecclesiastes:    "Eccl",
+  "Song of Songs": "Song",
+  Isaiah:          "Isa",
+  Jeremiah:        "Jer",
+  Lamentations:    "Lam",
+  Ezekiel:         "Ezek",
+  Daniel:          "Dan",
+  Hosea:           "Hos",
+  Joel:            "Joel",
+  Amos:            "Amos",
+  Obadiah:         "Obad",
+  Jonah:           "Jonah",
+  Micah:           "Mic",
+  Nahum:           "Nah",
+  Habakkuk:        "Hab",
+  Zephaniah:       "Zeph",
+  Haggai:          "Hag",
+  Zechariah:       "Zech",
+  Malachi:         "Mal",
+};
+
+/**
+ * Additional OT abbreviation aliases commonly found in scholarly refs
+ * beyond the canonical short forms above. Mapped to the full book name.
+ */
+const OT_ALIASES: Record<string, string> = {
+  Ex:    "Exodus",
+  Dt:    "Deuteronomy",
+  Jos:   "Joshua",
+  Jdg:   "Judges",
+  "1Sam": "1 Samuel",
+  "2Sam": "2 Samuel",
+  "1Ki":  "1 Kings",
+  "2Ki":  "2 Kings",
+  "1Ch":  "1 Chronicles",
+  "2Ch":  "2 Chronicles",
+  Est:   "Esther",
+  Pss:   "Psalms",
+  Pslm:  "Psalms",
+  Pro:   "Proverbs",
+  Ecc:   "Ecclesiastes",
+  Qoh:   "Ecclesiastes",
+  Cant:  "Song of Songs",
+  Is:    "Isaiah",
+  Jrm:   "Jeremiah",
+  Eze:   "Ezekiel",
+  Dn:    "Daniel",
+  Oba:   "Obadiah",
+  Jon:   "Jonah",
+  Nam:   "Nahum",
+  Zph:   "Zephaniah",
+  Zec:   "Zechariah",
+};
+
+// Combined abbreviation → full-book map, built from NT (constants) + OT.
 const ABBREV_TO_FULL: Record<string, string> = {};
 for (const [full, abbr] of Object.entries(BOOK_ABBREVIATIONS)) {
   ABBREV_TO_FULL[abbr] = full;
+}
+for (const [full, abbr] of Object.entries(OT_BOOK_ABBREVIATIONS)) {
+  ABBREV_TO_FULL[abbr] = full;
+}
+for (const [alias, full] of Object.entries(OT_ALIASES)) {
+  ABBREV_TO_FULL[alias] = full;
 }
 
 const SORTED_ABBREVS = Object.keys(ABBREV_TO_FULL).sort(
@@ -237,16 +368,17 @@ export function parseRef(ref: string): ParsedRef | null {
   const trimmed = ref.trim();
   if (!trimmed) return null;
 
+  // Match abbreviation. Require a space after the book name when the
+  // book doesn't end in a digit; allow no space otherwise (e.g. "1Cor").
   let bookAbbr: string | null = null;
   let rest = "";
   for (const abbr of SORTED_ABBREVS) {
-    if (
-      trimmed.startsWith(abbr) &&
-      trimmed.length > abbr.length &&
-      trimmed[abbr.length] === " "
-    ) {
+    if (!trimmed.startsWith(abbr)) continue;
+    if (trimmed.length === abbr.length) continue;
+    const next = trimmed[abbr.length];
+    if (next === " " || next === "." || /[0-9]/.test(next)) {
       bookAbbr = abbr;
-      rest = trimmed.slice(abbr.length + 1).trim();
+      rest = trimmed.slice(abbr.length).replace(/^[\s.]+/, "").trim();
       break;
     }
   }
@@ -262,7 +394,13 @@ export function parseRef(ref: string): ParsedRef | null {
   if (colonIdx === -1) return null;
 
   const chapter = parseInt(rest.slice(0, colonIdx), 10);
-  const verseRange = rest.slice(colonIdx + 1).trim();
+  // Normalize en-dash / em-dash → hyphen, strip trailing non-range tokens
+  // (e.g. footnote markers "a", "b") by keeping only digits + range hyphen.
+  const verseRange = rest.slice(colonIdx + 1)
+    .trim()
+    .replace(/[–—]/g, "-")
+    .split(",")[0]    // drop anything after a comma (list continuation)
+    .trim();
   if (!chapter || !verseRange) return null;
 
   const [startStr, endStr] = verseRange.split("-");
@@ -270,5 +408,57 @@ export function parseRef(ref: string): ParsedRef | null {
   const verseEnd   = endStr ? parseInt(endStr, 10) : verseStart;
   if (!verseStart) return null;
 
-  return { fullBook, usfmBook, chapter, verseStart, verseEnd, verseRange };
+  return {
+    fullBook, usfmBook, chapter, verseStart, verseEnd,
+    verseRange: verseEnd === verseStart ? String(verseStart) : `${verseStart}-${verseEnd}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// OT antecedent splitter
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse an ot_antecedent string into individual refs. The field is
+ * semicolon-separated, and continuation refs may omit the book (e.g.
+ * "Isa 35:5–6; 61:1" where "61:1" inherits "Isa"). This function
+ * propagates the most recently parsed book forward so those parse cleanly.
+ *
+ * Returns an array of { raw, parsed } so callers can surface unparseable
+ * entries without losing them.
+ */
+export interface SplitAntecedent {
+  raw:    string;
+  parsed: ParsedRef | null;
+}
+
+export function splitOTAntecedent(s: string | null | undefined): SplitAntecedent[] {
+  if (!s) return [];
+
+  const out: SplitAntecedent[] = [];
+  let lastBookAbbr: string | null = null;
+
+  for (const part of s.split(";").map((p) => p.trim()).filter(Boolean)) {
+    // Does this part start with a recognized book?
+    let startsWithBook = false;
+    for (const abbr of SORTED_ABBREVS) {
+      if (part.startsWith(abbr)) {
+        const next = part[abbr.length];
+        if (next === " " || next === "." || next === undefined || /[0-9]/.test(next)) {
+          startsWithBook = true;
+          lastBookAbbr = abbr;
+          break;
+        }
+      }
+    }
+
+    // If no book, prepend the last-seen book so "61:1" → "Isa 61:1"
+    const candidate = startsWithBook
+      ? part
+      : (lastBookAbbr ? `${lastBookAbbr} ${part}` : part);
+
+    out.push({ raw: part, parsed: parseRef(candidate) });
+  }
+
+  return out;
 }

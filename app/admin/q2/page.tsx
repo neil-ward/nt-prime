@@ -319,7 +319,7 @@ function RecordMatrix({ records }: { records: NTRecord[] }) {
                       {r.summary ? (
                         <span
                           className="text-[11px] text-stone-500 leading-snug line-clamp-1 cursor-pointer hover:text-stone-800 transition-colors"
-                          onClick={(e) => { e.stopPropagation(); openVerse(r.ref); }}
+                          onClick={(e) => { e.stopPropagation(); openVerse(r.ref, { otAntecedent: r.ot_antecedent }); }}
                           title="View verse text"
                         >
                           {r.summary}
@@ -448,14 +448,14 @@ function RecordGroup({ rating, records }: { rating: Rating; records: NTRecord[] 
                 {p.q2_notes ? (
                   <p
                     className="text-[11px] text-stone-500 leading-relaxed cursor-pointer hover:text-stone-800 transition-colors"
-                    onClick={() => openVerse(p.ref)}
+                    onClick={() => openVerse(p.ref, { otAntecedent: p.ot_antecedent })}
                     title="View verse text"
                   >
                     {p.q2_notes}
                   </p>
                 ) : (
                   <button
-                    onClick={() => openVerse(p.ref)}
+                    onClick={() => openVerse(p.ref, { otAntecedent: p.ot_antecedent })}
                     className="text-[10px] text-stone-400 hover:text-stone-600 italic transition-colors"
                   >
                     View verse text &rarr;
