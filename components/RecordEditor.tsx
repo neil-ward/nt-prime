@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from "react";
 import type { NTRecord } from "@/lib/types";
+import { OT_ROOT_CATEGORIES } from "@/lib/constants";
 
 interface RecordEditorProps {
   /** The record to edit. Pass a blank stub for "Add new". */
@@ -24,13 +25,13 @@ interface RecordEditorProps {
 // Field definitions — grouped into sections for rendering.
 // ---------------------------------------------------------------------------
 
-type FieldType = "text" | "textarea" | "bool" | "select";
+type FieldType = "text" | "textarea" | "bool" | "select" | "select-or-other";
 
 interface FieldDef {
   key:      keyof NTRecord;
   label:    string;
   type:     FieldType;
-  options?: string[];   // for select
+  options?: readonly string[];   // for select / select-or-other
   hint?:    string;
 }
 
@@ -94,10 +95,11 @@ const SECTIONS: { title: string; fields: FieldDef[] }[] = [
   {
     title: "OT / ANE ethical root",
     fields: [
-      { key: "ot_root_category", label: "OT root category", type: "text",
-        hint: "e.g. \"Justice & Mercy\", \"Cultic / Ritual Purity\", \"Covenant Loyalty\"" },
+      { key: "ot_root_category", label: "OT root category", type: "select-or-other",
+        options: OT_ROOT_CATEGORIES,
+        hint: "Pick the dominant OT/ANE register, or choose Other… for edge cases." },
       { key: "ot_root_notes",    label: "OT root notes",    type: "textarea",
-        hint: "Historical/ANE reasoning — why the OT root differs from the surface reading" },
+        hint: "Historical/ANE reasoning — why the OT root differs from the surface reading (e.g. boundary-stone rule = Justice & Mercy, because it protected weaker neighbors from land-fraud)" },
     ],
   },
   {
@@ -289,6 +291,12 @@ function Field({
             <option key={opt} value={opt}>{opt || "—"}</option>
           ))}
         </select>
+      ) : def.type === "select-or-other" ? (
+        <SelectOrOther
+          value={displayValue}
+          options={def.options!}
+          onChange={onChange}
+        />
       ) : def.type === "bool" ? (
         <div className="flex items-center gap-2 h-[30px]">
           <input
@@ -309,5 +317,69 @@ function Field({
       )}
       {def.hint && <span className="text-[9px] text-stone-400 italic">{def.hint}</span>}
     </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SelectOrOther — dropdown + free-text escape hatch.
+//
+// Renders a <select> with the predefined options plus an "Other…" item.
+// If the current value doesn't match any option, the widget remembers that
+// "Other" is selected and shows the text input below so the user can read
+// and edit the custom value. Picking a predefined option from the dropdown
+// hides the text input and updates the saved value to the selected option.
+// ---------------------------------------------------------------------------
+
+const OTHER = "__other__";
+
+function SelectOrOther({
+  value, options, onChange,
+}: {
+  value:    string;
+  options:  readonly string[];
+  onChange: (v: string | null) => void;
+}) {
+  const isInList = !value || options.includes(value as (typeof options)[number]);
+  // "Other" mode is active when we have a value that's not in the list.
+  const [otherMode, setOtherMode] = useState(!isInList && !!value);
+
+  function handleSelectChange(next: string) {
+    if (next === OTHER) {
+      setOtherMode(true);
+      // Keep current value if it's already a custom string; otherwise blank
+      // it so the user types a new one.
+      if (isInList) onChange(null);
+    } else {
+      setOtherMode(false);
+      onChange(next || null);
+    }
+  }
+
+  const selectValue = otherMode ? OTHER : value;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <select
+        value={selectValue}
+        onChange={(e) => handleSelectChange(e.target.value)}
+        className="w-full px-2 py-1.5 text-[12px] bg-stone-50 border border-stone-200 rounded text-stone-800 focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
+      >
+        <option value="">—</option>
+        {options.map((opt) => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+        <option value={OTHER}>Other…</option>
+      </select>
+      {otherMode && (
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value || null)}
+          placeholder="Custom category"
+          autoFocus
+          className="w-full px-2 py-1.5 text-[12px] bg-amber-50 border border-amber-200 rounded text-stone-800 placeholder-stone-300 focus:outline-none focus:border-amber-400 focus:bg-white transition-colors"
+        />
+      )}
+    </div>
   );
 }

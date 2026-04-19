@@ -14,6 +14,33 @@ export const DATASET_COLORS: Record<Dataset, string> = {
   D: "#e76f51", // coral / terracotta
 };
 
+// ---------------------------------------------------------------------------
+// OT / ANE ethical-root taxonomy
+//
+// Categorizes each NT command by the register of its underlying OT/ANE
+// ethical root, which can differ from its NT dataset classification.
+// Example: "do not move the boundary stone" is a NT-era communal-life
+// command whose ANE root is Justice & Mercy (protecting weaker neighbors
+// from being defrauded by boundary drift).
+//
+// The admin UI renders these as a dropdown with a free-text "Other…" escape
+// for edge cases; new consensus categories can be promoted into this list
+// over time.
+// ---------------------------------------------------------------------------
+
+export const OT_ROOT_CATEGORIES = [
+  "Covenant Loyalty",            // worship, sabbath, exclusive allegiance to YHWH
+  "Justice & Mercy",             // protecting the weak (widow, orphan, stranger)
+  "Economic Compassion",         // debt release, Jubilee, gleaning, generous lending
+  "Sexual Ethics & Family Order", // marriage, adultery, inheritance
+  "Ritual Purity",               // clean/unclean, sacrifice, holy days
+  "Communal Peace & Honor",      // honor parents, no murder, communal harmony
+  "Wisdom & Character",          // speech, work ethic, humility, fear of the Lord
+  "Land & Creation Care",        // stewardship, sabbath for land, animal welfare
+] as const;
+
+export type OTRootCategory = typeof OT_ROOT_CATEGORIES[number];
+
 export const DATASET_COLORS_LIGHT: Record<Dataset, string> = {
   A: "#d4f0ed", // soft teal tint
   B: "#daeaf3", // soft blue tint

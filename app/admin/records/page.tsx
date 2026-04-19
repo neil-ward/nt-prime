@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminGate, { useAdminToken } from "@/components/AdminGate";
 import RecordEditor from "@/components/RecordEditor";
 import type { NTRecord, Dataset } from "@/lib/types";
-import { DATASET_COLORS, DATASET_COLORS_LIGHT } from "@/lib/constants";
+import { DATASET_COLORS, DATASET_COLORS_LIGHT, OT_ROOT_CATEGORIES } from "@/lib/constants";
 
 export default function AdminRecordsPage() {
   return (
@@ -35,9 +35,10 @@ function RecordsContent() {
   const [error,   setError]   = useState<string | null>(null);
 
   // Filters
-  const [search,       setSearch]       = useState("");
-  const [datasetFilter, setDatasetFilter] = useState<Dataset | "all">("all");
-  const [otRootFilter, setOtRootFilter] = useState<"all" | "has" | "empty">("all");
+  const [search,           setSearch]           = useState("");
+  const [datasetFilter,    setDatasetFilter]    = useState<Dataset | "all">("all");
+  const [otRootFilter,     setOtRootFilter]     = useState<"all" | "has" | "empty">("all");
+  const [otCategoryFilter, setOtCategoryFilter] = useState<string>("");
 
   // Editor state
   const [editing, setEditing] = useState<NTRecord | null>(null);
@@ -73,11 +74,12 @@ function RecordsContent() {
       if (datasetFilter !== "all" && r.dataset !== datasetFilter) return false;
       if (otRootFilter === "has"   && !r.ot_root_category)         return false;
       if (otRootFilter === "empty" && !!r.ot_root_category)        return false;
+      if (otCategoryFilter && r.ot_root_category !== otCategoryFilter) return false;
       if (!q) return true;
       return [r.ref, r.summary, r.category, r.theme, r.speaker]
         .some((v) => v?.toLowerCase?.().includes(q));
     });
-  }, [records, search, datasetFilter, otRootFilter]);
+  }, [records, search, datasetFilter, otRootFilter, otCategoryFilter]);
 
   // ---- Mutations ----
   async function saveEdit(patch: Partial<NTRecord>) {
@@ -215,6 +217,19 @@ function RecordsContent() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-1.5">Category</p>
+              <select
+                value={otCategoryFilter}
+                onChange={(e) => setOtCategoryFilter(e.target.value)}
+                className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-stone-200 rounded text-stone-600 hover:border-stone-300 focus:outline-none focus:border-stone-400 transition-colors"
+              >
+                <option value="">All categories</option>
+                {OT_ROOT_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
           </div>
 
