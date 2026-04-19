@@ -67,7 +67,12 @@ async function fetchPassage(ref: string, version: VersionKey): Promise<Passage> 
   })();
 
   _inflight.set(key, promise);
-  promise.finally(() => _inflight.delete(key));
+  // Remove from inflight on settle. Attach a no-op .catch so the dev
+  // overlay doesn't flag this branch as an unhandled rejection —
+  // the real error handler is at the hook's call site.
+  promise
+    .finally(() => _inflight.delete(key))
+    .catch(() => {});
 
   return promise;
 }

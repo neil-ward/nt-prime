@@ -85,6 +85,14 @@ export const BOOK_TO_USFM: Record<string, string> = {
   "2 John":          "2JN",
   "3 John":          "3JN",
   Jude:              "JUD",
+  // ── Deuterocanonical / Apocrypha (common in scholarly cross-refs) ──
+  Tobit:       "TOB",
+  Judith:      "JDT",
+  Sirach:      "SIR",
+  Wisdom:      "WIS",
+  "1 Maccabees": "1MA",
+  "2 Maccabees": "2MA",
+  Baruch:      "BAR",
   Revelation:        "REV",
 };
 
@@ -290,7 +298,7 @@ const OT_BOOK_ABBREVIATIONS: Record<string, string> = {
 };
 
 /**
- * Additional OT abbreviation aliases commonly found in scholarly refs
+ * Additional OT + DC abbreviation aliases commonly found in scholarly refs
  * beyond the canonical short forms above. Mapped to the full book name.
  */
 const OT_ALIASES: Record<string, string> = {
@@ -320,10 +328,27 @@ const OT_ALIASES: Record<string, string> = {
   Nam:   "Nahum",
   Zph:   "Zephaniah",
   Zec:   "Zechariah",
+  // Deuterocanonical short forms
+  Tob:   "Tobit",
+  Jdth:  "Judith",
+  Sir:   "Sirach",
+  Wis:   "Wisdom",
+  "1Macc": "1 Maccabees",
+  "2Macc": "2 Maccabees",
+  Bar:   "Baruch",
 };
 
-// Combined abbreviation → full-book map, built from NT (constants) + OT.
+// Combined abbreviation → full-book map.
+// Sources (in order, later wins on collision):
+//   - Full book names themselves (so "Isaiah 35:5-6" parses, not just "Isa 35:5-6")
+//   - NT abbreviations from constants (Matt, 1 Cor, …)
+//   - OT abbreviations (Gen, Exod, 1 Sam, …)
+//   - Scholarly OT aliases (Dt, Eze, Qoh, Cant, …)
 const ABBREV_TO_FULL: Record<string, string> = {};
+// Full names map to themselves — handles "Isaiah 35:5-6", "1 Corinthians 13:4-7", etc.
+for (const full of Object.keys(BOOK_TO_USFM)) {
+  ABBREV_TO_FULL[full] = full;
+}
 for (const [full, abbr] of Object.entries(BOOK_ABBREVIATIONS)) {
   ABBREV_TO_FULL[abbr] = full;
 }
@@ -365,20 +390,25 @@ export interface ParsedRef {
 }
 
 export function parseRef(ref: string): ParsedRef | null {
-  const trimmed = ref.trim();
-  if (!trimmed) return null;
+  // Strip parenthetical annotations like "Exod 12 (Passover)" before parsing.
+  // Also normalize en-dashes and em-dashes → hyphens throughout.
+  const cleaned = ref
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/[–—]/g, "-")
+    .trim();
+  if (!cleaned) return null;
 
-  // Match abbreviation. Require a space after the book name when the
-  // book doesn't end in a digit; allow no space otherwise (e.g. "1Cor").
+  // Match abbreviation. Allow: space, ".", or a digit directly after
+  // the book name (so "Gen 4", "Gen.4", and "Gen4" all parse).
   let bookAbbr: string | null = null;
   let rest = "";
   for (const abbr of SORTED_ABBREVS) {
-    if (!trimmed.startsWith(abbr)) continue;
-    if (trimmed.length === abbr.length) continue;
-    const next = trimmed[abbr.length];
+    if (!cleaned.startsWith(abbr)) continue;
+    if (cleaned.length === abbr.length) continue;
+    const next = cleaned[abbr.length];
     if (next === " " || next === "." || /[0-9]/.test(next)) {
       bookAbbr = abbr;
-      rest = trimmed.slice(abbr.length).replace(/^[\s.]+/, "").trim();
+      rest = cleaned.slice(abbr.length).replace(/^[\s.]+/, "").trim();
       break;
     }
   }
@@ -391,15 +421,25 @@ export function parseRef(ref: string): ParsedRef | null {
   if (!usfmBook) return null;
 
   const colonIdx = rest.indexOf(":");
-  if (colonIdx === -1) return null;
+
+  // ── No colon: whole-chapter reference (e.g. "Exod 32", "Isa 53") or
+  //    cross-chapter range (e.g. "Gen 6-8", "Lev 17-18"). Treat as the
+  //    first verse of the first chapter so the reader lands on something
+  //    and can tell they're in the right passage.
+  if (colonIdx === -1) {
+    const chapterPart = rest.split("-")[0].split(",")[0].trim();
+    const chapter     = parseInt(chapterPart, 10);
+    if (!chapter) return null;
+    return {
+      fullBook, usfmBook, chapter,
+      verseStart: 1, verseEnd: 1, verseRange: "1",
+    };
+  }
 
   const chapter = parseInt(rest.slice(0, colonIdx), 10);
-  // Normalize en-dash / em-dash → hyphen, strip trailing non-range tokens
-  // (e.g. footnote markers "a", "b") by keeping only digits + range hyphen.
+  // Keep only the first verse range; drop comma-separated continuations.
   const verseRange = rest.slice(colonIdx + 1)
-    .trim()
-    .replace(/[–—]/g, "-")
-    .split(",")[0]    // drop anything after a comma (list continuation)
+    .split(",")[0]
     .trim();
   if (!chapter || !verseRange) return null;
 

@@ -232,10 +232,10 @@ export default function VerseModal({
 // ---------------------------------------------------------------------------
 // OTBlock — one OT antecedent entry inside the left pane.
 //
-// For each parsed OT ref we fetch through /api/verse (which always returns
-// ±4 verses of context) and then trim the rendered list down to just the
-// originally-selected verses — OT antecedents read best without the extra
-// surrounding verses. Unparseable refs show the raw label only.
+// Each entry shows the parsed OT passage with ±context verses from the
+// API, with the originally-cited verse(s) visually highlighted in amber
+// (mirrors the NT pane's treatment). Unparseable refs show the raw
+// label only.
 // ---------------------------------------------------------------------------
 
 function OTBlock({
@@ -254,7 +254,6 @@ function OTBlock({
   const { passage, loading, error } = useVerseText(fetchRef, version);
 
   if (!parsedRef) {
-    // Unparseable — show the raw label only
     return (
       <div>
         <p className="text-[11px] font-serif font-semibold text-stone-700 mb-0.5">{raw}</p>
@@ -269,27 +268,50 @@ function OTBlock({
         {passage?.reference ?? raw}
       </p>
       {loading && (
-        <p className="text-[10px] text-stone-400 italic animate-pulse">Loading…</p>
+        <p className="text-[10px] text-stone-400 italic animate-pulse">Loading&hellip;</p>
       )}
       {error && (
         <p className="text-[10px] text-stone-400 italic">{error}</p>
       )}
       {passage && (
-        <ul className="space-y-1">
-          {passage.verses
-            // Trim to just the originally-selected verses — we asked the hook
-            // for default context, but OT antecedents read best without extra.
-            .filter((v) => v.num >= passage.selectedStart && v.num <= passage.selectedEnd)
-            .map((v) => (
-              <li key={v.num} className="flex items-baseline gap-2">
-                <span className="w-5 text-right shrink-0 text-[9px] text-stone-400 tabular-nums select-none font-semibold">
+        <ul className="space-y-0.5">
+          {passage.verses.map((v) => {
+            const selected = v.num >= passage.selectedStart && v.num <= passage.selectedEnd;
+            return (
+              <li
+                key={v.num}
+                className="flex items-baseline gap-2 py-0.5 rounded-sm transition-colors"
+                style={
+                  selected
+                    ? {
+                        backgroundColor: HIGHLIGHT_BG,
+                        borderLeft: `2px solid ${HIGHLIGHT_BORDER}`,
+                        paddingLeft: "6px",
+                        marginLeft: "-8px",
+                        paddingRight: "4px",
+                      }
+                    : {}
+                }
+              >
+                <span
+                  className={`w-5 text-right shrink-0 text-[9px] tabular-nums select-none ${
+                    selected
+                      ? "text-amber-700 font-bold"
+                      : "text-stone-400 font-semibold"
+                  }`}
+                >
                   {v.num}
                 </span>
-                <span className="flex-1 text-[12px] leading-relaxed text-stone-700">
-                  {v.english ?? <span className="text-stone-300 italic">—</span>}
+                <span
+                  className={`flex-1 text-[12px] leading-relaxed ${
+                    selected ? "text-stone-900" : "text-stone-600"
+                  }`}
+                >
+                  {v.english ?? <span className="text-stone-300 italic">&mdash;</span>}
                 </span>
               </li>
-            ))}
+            );
+          })}
         </ul>
       )}
     </div>
