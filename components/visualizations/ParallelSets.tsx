@@ -1,17 +1,24 @@
 "use client";
 
 /**
- * ParallelSets — Q1 anchor visualization
+ * ParallelSets — Q1 anchor visualization.
  *
- * Modes:
- *   showBook=false  →  3 axes: Speaker → NT Section → Dataset
- *   showBook=true   →  4 axes: Speaker → NT Section → Book → Dataset
+ * Supports a variable number of axes assembled from four optional
+ * dimensions. In canonical order:
+ *
+ *   [OT Root] → Speaker → NT Section → [Book] → Dataset
+ *
+ * The leftmost OT Root axis and the mid Book axis are independently
+ * toggleable via the `showOTRoot` and `showBook` props. The Speaker,
+ * NT Section, and Dataset axes are always present.
  *
  * colorBy="dataset"  ribbons colored by Dataset (A/B/D)
  * colorBy="speaker"  ribbons colored by Speaker group
+ * colorBy="otRoot"   ribbons colored by OT root category (only meaningful
+ *                    when the OT Root axis is enabled)
  */
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { NTRecord, Dataset, SpeakerGroup, NTSection } from "@/lib/types";
 import {
   DATASET_COLORS,
@@ -23,36 +30,99 @@ import {
   BOOK_ABBREVIATIONS,
   BOOK_TO_SECTION,
   NT_SECTION_COLORS,
+  OT_ROOT_ORDER,
+  OT_ROOT_COLORS,
+  OT_ROOT_ABBREVIATIONS,
   datasetColor,
   speakerColor,
+  otRootColor,
 } from "@/lib/constants";
+
+// ---------------------------------------------------------------------------
+// Dimension definitions — one per possible axis.
+// ---------------------------------------------------------------------------
+
+type DimensionKey = "otRoot" | "speaker" | "section" | "book" | "dataset";
+
+interface Dimension {
+  key:      DimensionKey;
+  header:   string;                                 // axis header (e.g. "OT ROOT")
+  order:    readonly string[];                      // display order of values
+  get:      (r: NTRecord) => string;                // value extractor
+  label:    (v: string) => string;                  // axis-label formatter
+  color:    (v: string) => string;                  // axis-node color
+}
+
+const UNCATEGORIZED = "(uncategorized)";
+
+const DIM_OT_ROOT: Dimension = {
+  key:    "otRoot",
+  header: "OT ROOT",
+  order:  [...OT_ROOT_ORDER, UNCATEGORIZED],
+  get:    (r) => r.ot_root_category ?? UNCATEGORIZED,
+  label:  (v) => v === UNCATEGORIZED ? "—" : (OT_ROOT_ABBREVIATIONS[v] ?? v),
+  color:  (v) => OT_ROOT_COLORS[v] ?? "#94a3b8",
+};
+
+const DIM_SPEAKER: Dimension = {
+  key:    "speaker",
+  header: "SPEAKER",
+  order:  SPEAKER_ORDER,
+  get:    (r) => r.speaker_group,
+  label:  (v) => v,
+  color:  () => "#334155",
+};
+
+const DIM_SECTION: Dimension = {
+  key:    "section",
+  header: "NT SECTION",
+  order:  NT_SECTION_ORDER,
+  get:    (r) => r.nt_section,
+  label:  (v) => v,
+  color:  () => "#334155",
+};
+
+const DIM_BOOK: Dimension = {
+  key:    "book",
+  header: "BOOK",
+  order:  BOOK_ORDER,
+  get:    (r) => r.book,
+  label:  (v) => BOOK_ABBREVIATIONS[v] ?? v,
+  color:  (v) => {
+    const sec = BOOK_TO_SECTION[v];
+    return sec ? (NT_SECTION_COLORS[sec] ?? "#334155") : "#334155";
+  },
+};
+
+const DIM_DATASET: Dimension = {
+  key:    "dataset",
+  header: "DATASET",
+  order:  DATASET_ORDER,
+  get:    (r) => r.dataset,
+  label:  (v) => DATASET_LABELS[v as Dataset] ?? v,
+  color:  (v) => DATASET_COLORS[v as Dataset] ?? "#64748b",
+};
 
 // ---------------------------------------------------------------------------
 // Internal types
 // ---------------------------------------------------------------------------
 
 interface AxisNode {
-  axis: number;
+  axis:  number;
   value: string;
   total: number;
-  y0: number;
-  y1: number;
+  y0:    number;
+  y1:    number;
 }
 
 interface Ribbon {
-  key: string;
-  speaker: SpeakerGroup;
-  section: NTSection;
-  book: string;       // "" when showBook=false
-  dataset: Dataset;
-  count: number;
-  citedCount: number;
-  hasCited: boolean;
-  /**
-   * spans[i] = [leftTop, leftBot, rightTop, rightBot] normalized 0–1
-   * 2 spans in 3-axis mode, 3 spans in 4-axis mode
-   */
-  spans: [number, number, number, number][];
+  key:         string;
+  path:        string[];               // value at each axis, in order
+  count:       number;
+  citedCount:  number;
+  hasCited:    boolean;
+  /** One span per gap between consecutive axes: [leftTop, leftBot, rightTop, rightBot] normalized 0-1 */
+  spans:       [number, number, number, number][];
 }
 
 // ---------------------------------------------------------------------------
@@ -66,168 +136,152 @@ const RIBBON_OPACITY       = 0.40;
 const RIBBON_HOVER_OPACITY = 0.82;
 const RIBBON_FADE_OPACITY  = 0.05;
 
+/**
+ * Column-X coordinates as fractions of total width, keyed by axis count.
+ * The left/right edges leave room for axis labels (OT Root in particular
+ * has longer labels than Speaker, so the left gutter grows).
+ */
+const COL_FRACTIONS: Record<number, number[]> = {
+  3: [0.05, 0.44, 0.83],
+  4: [0.05, 0.30, 0.55, 0.84],
+  5: [0.10, 0.28, 0.46, 0.64, 0.86],
+};
+
 // ---------------------------------------------------------------------------
 // Layout computation
 // ---------------------------------------------------------------------------
 
 interface LayoutResult {
-  axes: AxisNode[][];
-  colX: number[];
-  ribbons: Ribbon[];
-  py: (n: number) => number;
+  axes:       AxisNode[][];
+  colX:       number[];
+  ribbons:    Ribbon[];
+  py:         (n: number) => number;
   ribbonPath: (x0: number, lt: number, lb: number, x1: number, rt: number, rb: number) => string;
-  top: number;
+  top:        number;
+  dimensions: Dimension[];
 }
 
 function computeLayout(
-  records: NTRecord[],
-  width: number,
-  height: number,
-  showBook: boolean
+  records:  NTRecord[],
+  width:    number,
+  height:   number,
+  dimensions: Dimension[],
 ): LayoutResult {
   const usableH = height * (1 - H_PADDING * 2);
   const top     = height * H_PADDING;
   const py      = (n: number) => top + n * usableH;
 
-  const colX = showBook
-    ? [width * 0.05, width * 0.30, width * 0.55, width * 0.84]
-    : [width * 0.05, width * 0.44, width * 0.83];
+  const n = dimensions.length;
+  const colFrac = COL_FRACTIONS[n] ?? COL_FRACTIONS[4];
+  const colX = colFrac.map((f) => width * f);
 
-  // ── Totals ──
-  const spTotals:  Record<string, number> = {};
-  const secTotals: Record<string, number> = {};
-  const bkTotals:  Record<string, number> = {};
-  const dsTotals:  Record<string, number> = {};
+  // ── Totals per dimension value ──
+  const totals: Record<string, number>[] = dimensions.map(() => ({}));
   for (const r of records) {
-    spTotals[r.speaker_group]  = (spTotals[r.speaker_group]  ?? 0) + 1;
-    secTotals[r.nt_section]    = (secTotals[r.nt_section]    ?? 0) + 1;
-    bkTotals[r.book]           = (bkTotals[r.book]           ?? 0) + 1;
-    dsTotals[r.dataset]        = (dsTotals[r.dataset]        ?? 0) + 1;
+    for (let i = 0; i < n; i++) {
+      const v = dimensions[i].get(r);
+      totals[i][v] = (totals[i][v] ?? 0) + 1;
+    }
   }
   const total = records.length;
 
-  function buildAxis(order: string[], totals: Record<string, number>, axisIdx: number): AxisNode[] {
-    const present  = order.filter((v) => (totals[v] ?? 0) > 0);
+  // ── Axis layouts ──
+  function buildAxis(dim: Dimension, totalsI: Record<string, number>, axisIdx: number): AxisNode[] {
+    const present  = dim.order.filter((v) => (totalsI[v] ?? 0) > 0);
     const barTotal = 1 - Math.max(0, present.length - 1) * NODE_GAP;
     let cursor = 0;
     return present.map((v) => {
-      const nodeH = ((totals[v] ?? 0) / total) * barTotal;
-      const node: AxisNode = { axis: axisIdx, value: v, total: totals[v] ?? 0, y0: cursor, y1: cursor + nodeH };
+      const nodeH = ((totalsI[v] ?? 0) / total) * barTotal;
+      const node: AxisNode = { axis: axisIdx, value: v, total: totalsI[v] ?? 0, y0: cursor, y1: cursor + nodeH };
       cursor += nodeH + NODE_GAP;
       return node;
     });
   }
+  const axes: AxisNode[][] = dimensions.map((d, i) => buildAxis(d, totals[i], i));
 
-  const axis0  = buildAxis(SPEAKER_ORDER,    spTotals,  0);
-  const axis1  = buildAxis(NT_SECTION_ORDER, secTotals, 1);
-  const axis2B = buildAxis(BOOK_ORDER,       bkTotals,  2);               // book axis (4-axis mode)
-  const axis2D = buildAxis(DATASET_ORDER,    dsTotals,  2);               // dataset axis (3-axis mode)
-  const axis3  = buildAxis(DATASET_ORDER,    dsTotals,  3);               // dataset axis (4-axis mode)
-
-  const allAxes  = showBook ? [axis0, axis1, axis2B, axis3] : [axis0, axis1, axis2D];
-  const barTots  = allAxes.map((ax) => 1 - Math.max(0, ax.length - 1) * NODE_GAP);
+  // ── Bar totals (normalized 0-1 for fraction-of-axis accounting) ──
+  const barTots = axes.map((ax) => 1 - Math.max(0, ax.length - 1) * NODE_GAP);
 
   // ── Segment cursors ──
-  // segR[axisIdx][value] = running top-cursor on right edge of that axis bar
-  // segL[axisIdx][value] = running top-cursor on left  edge of that axis bar
-  const segR: Record<string, number>[] = allAxes.map((ax) =>
-    Object.fromEntries(ax.map((n) => [n.value, n.y0]))
+  // segR[i][value] = running top-cursor on right edge of axis i
+  // segL[i][value] = running top-cursor on left  edge of axis i
+  const segR: Record<string, number>[] = axes.map((ax) =>
+    Object.fromEntries(ax.map((nd) => [nd.value, nd.y0]))
   );
-  const segL: Record<string, number>[] = allAxes.map((ax) =>
-    Object.fromEntries(ax.map((n) => [n.value, n.y0]))
+  const segL: Record<string, number>[] = axes.map((ax) =>
+    Object.fromEntries(ax.map((nd) => [nd.value, nd.y0]))
   );
 
-  // ── Cited counts ──
-  const citedCounts: Record<string, number> = {};
+  // ── Group records by their N-tuple of dimension values ──
+  // Preserves dimension-wise order so ribbons pack consistently.
+  const groups = new Map<string, { path: string[]; count: number; cited: number }>();
 
-  // ── Build ribbons ──
+  // Iterate in canonical dimension order so ribbon packing is stable
+  const orderedKeys = (function buildOrderedKeys(): string[][] {
+    let result: string[][] = [[]];
+    for (const dim of dimensions) {
+      const next: string[][] = [];
+      for (const prefix of result) {
+        for (const v of dim.order) next.push([...prefix, v]);
+      }
+      result = next;
+    }
+    return result;
+  })();
+
+  // Tally records into their path buckets
+  const seenPaths = new Set<string>();
+  for (const r of records) {
+    const path = dimensions.map((d) => d.get(r));
+    const key  = path.join("|");
+    seenPaths.add(key);
+    const g = groups.get(key);
+    if (g) {
+      g.count += 1;
+      if (r.commonly_cited) g.cited += 1;
+    } else {
+      groups.set(key, { path, count: 1, cited: r.commonly_cited ? 1 : 0 });
+    }
+  }
+
+  // ── Build ribbons in canonical order ──
   const ribbons: Ribbon[] = [];
+  for (const path of orderedKeys) {
+    const key = path.join("|");
+    if (!seenPaths.has(key)) continue;
+    const g = groups.get(key)!;
+    const frac = g.count / total;
 
-  if (showBook) {
-    // 4-axis: Speaker → Section → Book → Dataset  (3 spans)
-    for (const sp of SPEAKER_ORDER) {
-      for (const sec of NT_SECTION_ORDER) {
-        for (const bk of BOOK_ORDER) {
-          for (const ds of DATASET_ORDER) {
-            let count = 0;
-            for (const r of records) {
-              if (r.speaker_group === sp && r.nt_section === sec && r.book === bk && r.dataset === ds) count++;
-            }
-            if (count === 0) continue;
+    const spans: [number, number, number, number][] = [];
+    for (let i = 0; i < n - 1; i++) {
+      const vL = path[i];
+      const vR = path[i + 1];
 
-            const frac = count / total;
-            const [bt0, bt1, bt2, bt3] = barTots;
-
-            const sp0lTop = segR[0][sp];   segR[0][sp]  += frac * bt0; const sp0lBot = segR[0][sp];
-            const sp0rTop = segL[1][sec];  segL[1][sec] += frac * bt1; const sp0rBot = segL[1][sec];
-            const sp1lTop = segR[1][sec];  segR[1][sec] += frac * bt1; const sp1lBot = segR[1][sec];
-            const sp1rTop = segL[2][bk];   segL[2][bk]  += frac * bt2; const sp1rBot = segL[2][bk];
-            const sp2lTop = segR[2][bk];   segR[2][bk]  += frac * bt2; const sp2lBot = segR[2][bk];
-            const sp2rTop = segL[3][ds];   segL[3][ds]  += frac * bt3; const sp2rBot = segL[3][ds];
-
-            const key = `${sp}|${sec}|${bk}|${ds}`;
-            const cc  = records.filter((r) => r.speaker_group === sp && r.nt_section === sec && r.book === bk && r.dataset === ds && r.commonly_cited).length;
-            citedCounts[key] = cc;
-
-            ribbons.push({
-              key, speaker: sp as SpeakerGroup, section: sec as NTSection, book: bk, dataset: ds as Dataset,
-              count, citedCount: cc, hasCited: cc > 0,
-              spans: [
-                [sp0lTop, sp0lBot, sp0rTop, sp0rBot],
-                [sp1lTop, sp1lBot, sp1rTop, sp1rBot],
-                [sp2lTop, sp2lBot, sp2rTop, sp2rBot],
-              ],
-            });
-          }
-        }
-      }
+      const lTop = segR[i][vL];        segR[i][vL]     += frac * barTots[i];     const lBot = segR[i][vL];
+      const rTop = segL[i + 1][vR];    segL[i + 1][vR] += frac * barTots[i + 1]; const rBot = segL[i + 1][vR];
+      spans.push([lTop, lBot, rTop, rBot]);
     }
-  } else {
-    // 3-axis: Speaker → Section → Dataset  (2 spans)
-    for (const sp of SPEAKER_ORDER) {
-      for (const sec of NT_SECTION_ORDER) {
-        for (const ds of DATASET_ORDER) {
-          let count = 0;
-          let cc    = 0;
-          for (const r of records) {
-            if (r.speaker_group === sp && r.nt_section === sec && r.dataset === ds) {
-              count++;
-              if (r.commonly_cited) cc++;
-            }
-          }
-          if (count === 0) continue;
 
-          const frac = count / total;
-          const [bt0, bt1, bt2] = barTots;
-
-          const sp0lTop = segR[0][sp];   segR[0][sp]  += frac * bt0; const sp0lBot = segR[0][sp];
-          const sp0rTop = segL[1][sec];  segL[1][sec] += frac * bt1; const sp0rBot = segL[1][sec];
-          const sp1lTop = segR[1][sec];  segR[1][sec] += frac * bt1; const sp1lBot = segR[1][sec];
-          const sp1rTop = segL[2][ds];   segL[2][ds]  += frac * bt2; const sp1rBot = segL[2][ds];
-
-          ribbons.push({
-            key: `${sp}|${sec}|${ds}`, speaker: sp as SpeakerGroup, section: sec as NTSection,
-            book: "", dataset: ds as Dataset, count, citedCount: cc, hasCited: cc > 0,
-            spans: [
-              [sp0lTop, sp0lBot, sp0rTop, sp0rBot],
-              [sp1lTop, sp1lBot, sp1rTop, sp1rBot],
-            ],
-          });
-        }
-      }
-    }
+    ribbons.push({
+      key,
+      path,
+      count:      g.count,
+      citedCount: g.cited,
+      hasCited:   g.cited > 0,
+      spans,
+    });
   }
 
   function ribbonPath(
     x0: number, lt: number, lb: number,
-    x1: number, rt: number, rb: number
+    x1: number, rt: number, rb: number,
   ): string {
     const mx = (x0 + x1) / 2;
     const [t0, b0, t1, b1] = [py(lt), py(lb), py(rt), py(rb)];
     return `M ${x0} ${t0} C ${mx} ${t0}, ${mx} ${t1}, ${x1} ${t1} L ${x1} ${b1} C ${mx} ${b1}, ${mx} ${b0}, ${x0} ${b0} Z`;
   }
 
-  return { axes: allAxes, colX, ribbons, py, ribbonPath, top };
+  return { axes, colX, ribbons, py, ribbonPath, top, dimensions };
 }
 
 // ---------------------------------------------------------------------------
@@ -236,9 +290,10 @@ function computeLayout(
 
 export interface RibbonClickPayload {
   key:     string;
+  otRoot:  string;           // "" when OT Root axis is disabled
   speaker: SpeakerGroup;
   section: NTSection;
-  book:    string;
+  book:    string;           // "" when Book axis is disabled
   dataset: Dataset;
   count:   number;
 }
@@ -251,32 +306,33 @@ interface ParallelSetsProps {
   records:            NTRecord[];
   height?:            number;
   showBook?:          boolean;
+  showOTRoot?:        boolean;
   commonlyCitedOnly?: boolean;
-  colorBy?:           "dataset" | "speaker";
+  colorBy?:           "dataset" | "speaker" | "otRoot";
   onRibbonClick?:     (payload: RibbonClickPayload) => void;
   /**
    * When provided, draws a tapered bezier "tail" from the active ribbon's
-   * last-axis span into the adjacent sidebar area. The path uses SVG
-   * overflow-visible to extend rightward beyond the SVG width.
+   * last-axis span into the adjacent sidebar area.
    */
   connector?: {
-    gap:          number;  // px between the SVG right edge and the sidebar
-    headerHeight: number;  // px of the sidebar header to fan into
+    gap:          number;
+    headerHeight: number;
     selectedKey:  string | null;
   };
 }
 
 export default function ParallelSets({
   records,
-  height = 620,
-  showBook = true,
+  height            = 620,
+  showBook          = true,
+  showOTRoot        = false,
   commonlyCitedOnly = false,
-  colorBy = "dataset",
+  colorBy           = "dataset",
   onRibbonClick,
   connector,
 }: ParallelSetsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth]   = useState(900);
+  const [width, setWidth]     = useState(900);
   const [hovered, setHovered] = useState<string | null>(null);
 
   useEffect(() => {
@@ -289,7 +345,23 @@ export default function ParallelSets({
     return () => ro.disconnect();
   }, []);
 
-  const layout = computeLayout(records, width, height, showBook);
+  // Build the active dimension list
+  const dimensions = useMemo<Dimension[]>(() => {
+    const dims: Dimension[] = [];
+    if (showOTRoot) dims.push(DIM_OT_ROOT);
+    dims.push(DIM_SPEAKER, DIM_SECTION);
+    if (showBook)   dims.push(DIM_BOOK);
+    dims.push(DIM_DATASET);
+    return dims;
+  }, [showOTRoot, showBook]);
+
+  // Helper to find a dimension's index in the current axis list
+  const dimIdx = useCallback(
+    (key: DimensionKey) => dimensions.findIndex((d) => d.key === key),
+    [dimensions],
+  );
+
+  const layout = computeLayout(records, width, height, dimensions);
   const { axes, colX, ribbons, py, ribbonPath, top } = layout;
   const axisCount = axes.length;
 
@@ -301,36 +373,34 @@ export default function ParallelSets({
       if (colon === -1) return false;
       const ai  = parseInt(hovered.slice(0, colon));
       const val = hovered.slice(colon + 1);
-      if (ai === 0)               return r.speaker === val;
-      if (ai === 1)               return r.section === val;
-      if (ai === 2 && axisCount === 4) return r.book    === val;
-      if (ai === axisCount - 1)   return r.dataset === val;
-      return false;
+      return r.path[ai] === val;
     },
-    [hovered, axisCount]
+    [hovered],
   );
 
-  const axisLabel = (ai: number, value: string): string => {
-    if (ai === axisCount - 1)       return DATASET_LABELS[value as Dataset] ?? value;
-    if (ai === 2 && axisCount === 4) return BOOK_ABBREVIATIONS[value] ?? value;
-    return value;
-  };
-
-  const axisNodeColor = (ai: number, value: string): string => {
-    if (ai === axisCount - 1) return DATASET_COLORS[value as Dataset] ?? "#64748b";
-    if (ai === 2 && axisCount === 4) {
-      const sec = BOOK_TO_SECTION[value];
-      return sec ? (NT_SECTION_COLORS[sec] ?? "#334155") : "#334155";
+  const ribbonFill = useCallback((r: Ribbon): string => {
+    if (colorBy === "speaker") return speakerColor(r.path[dimIdx("speaker")] as SpeakerGroup);
+    if (colorBy === "otRoot") {
+      const ri = dimIdx("otRoot");
+      if (ri >= 0) return otRootColor(r.path[ri]);
+      return datasetColor(r.path[dimIdx("dataset")] as Dataset);
     }
-    return "#334155";
-  };
+    return datasetColor(r.path[dimIdx("dataset")] as Dataset);
+  }, [colorBy, dimIdx]);
 
-  const ribbonFill = (r: Ribbon): string =>
-    colorBy === "speaker" ? speakerColor(r.speaker) : datasetColor(r.dataset);
-
-  const AXIS_HEADERS = showBook
-    ? ["SPEAKER", "NT SECTION", "BOOK", "DATASET"]
-    : ["SPEAKER", "NT SECTION", "DATASET"];
+  // Resolve a ribbon's path back into the payload shape (dimensions may be absent)
+  const payloadFor = useCallback(
+    (r: Ribbon): RibbonClickPayload => ({
+      key:     r.key,
+      otRoot:  dimIdx("otRoot")  >= 0 ? r.path[dimIdx("otRoot")]  : "",
+      speaker: r.path[dimIdx("speaker")] as SpeakerGroup,
+      section: r.path[dimIdx("section")] as NTSection,
+      book:    dimIdx("book")    >= 0 ? r.path[dimIdx("book")]    : "",
+      dataset: r.path[dimIdx("dataset")] as Dataset,
+      count:   r.count,
+    }),
+    [dimIdx],
+  );
 
   return (
     <div ref={containerRef} className="w-full select-none" style={{ height }}>
@@ -344,7 +414,7 @@ export default function ParallelSets({
           const onLeave = () => setHovered(null);
           const onClick = (e: React.MouseEvent) => {
             e.stopPropagation();
-            onRibbonClick?.({ key: r.key, speaker: r.speaker, section: r.section, book: r.book, dataset: r.dataset, count: r.count });
+            onRibbonClick?.(payloadFor(r));
           };
 
           const paths = r.spans.map((sp, i) =>
@@ -394,103 +464,112 @@ export default function ParallelSets({
         })}
 
         {/* ── Axis bars + labels ── */}
-        {axes.map((axisNodes, ai) => (
-          <g key={ai}>
-            {axisNodes.map((node) => {
-              const nodeKey = `${ai}:${node.value}`;
-              const isAct  = hovered === nodeKey;
-              const yTop   = py(node.y0);
-              const yBot   = py(node.y1);
-              const nodeH  = yBot - yTop;
-              const isTiny = nodeH < 12;
-              const midY   = yTop + nodeH / 2;
-              const labelY = isTiny ? yTop - 2 : midY;
+        {axes.map((axisNodes, ai) => {
+          const dim = dimensions[ai];
+          return (
+            <g key={ai}>
+              {axisNodes.map((node) => {
+                const nodeKey = `${ai}:${node.value}`;
+                const isAct  = hovered === nodeKey;
+                const yTop   = py(node.y0);
+                const yBot   = py(node.y1);
+                const nodeH  = yBot - yTop;
+                const isTiny = nodeH < 12;
+                const midY   = yTop + nodeH / 2;
+                const labelY = isTiny ? yTop - 2 : midY;
 
-              const labelX =
-                ai === 0              ? colX[0] - 8
-                : ai === axisCount-1  ? colX[ai] + AXIS_WIDTH + 8
-                : ai === 2 && axisCount === 4 ? colX[2] + AXIS_WIDTH + 8
-                : colX[ai] + AXIS_WIDTH / 2;
+                // Label placement rules:
+                //   - First axis (ai=0): label to the LEFT of the bar
+                //   - Last axis: label to the RIGHT of the bar
+                //   - Book axis (when present and not last): label to the RIGHT
+                //   - Other middle axes: label CENTERED inside the bar
+                const isFirst    = ai === 0;
+                const isLast     = ai === axisCount - 1;
+                const isBookAxis = dim.key === "book";
 
-              const anchor =
-                ai === 0 ? "end"
-                : (ai === axisCount - 1 || (ai === 2 && axisCount === 4)) ? "start"
-                : "middle";
+                const labelX =
+                  isFirst                       ? colX[0] - 8
+                  : isLast                      ? colX[ai] + AXIS_WIDTH + 8
+                  : isBookAxis                  ? colX[ai] + AXIS_WIDTH + 8
+                  : colX[ai] + AXIS_WIDTH / 2;
 
-              const fontSize = (ai === 2 && axisCount === 4)
-                ? (nodeH > 18 ? 10 : 9)
-                : (nodeH > 24 ? 12 : 10);
+                const anchor =
+                  isFirst                     ? "end"
+                  : (isLast || isBookAxis)    ? "start"
+                  : "middle";
 
-              return (
-                <g key={node.value} className="cursor-pointer"
-                  onMouseEnter={(e) => { e.stopPropagation(); setHovered(nodeKey); }}
-                  onMouseLeave={() => setHovered(null)}
-                >
-                  <rect
-                    x={colX[ai]} y={yTop}
-                    width={AXIS_WIDTH} height={Math.max(nodeH, 1)}
-                    fill={axisNodeColor(ai, node.value)}
-                    opacity={!hovered ? 0.80 : isAct ? 1 : 0.28}
-                    rx={2} className="transition-opacity duration-150"
-                  />
-                  <g className="pointer-events-none">
-                    {/* Callout tick for tiny nodes on left & book axes */}
-                    {isTiny && (ai === 0 || (ai === 2 && axisCount === 4)) && (
-                      <line
-                        x1={ai === 0 ? colX[0] - 4 : colX[2] + AXIS_WIDTH + 4} y1={midY}
-                        x2={ai === 0 ? colX[0] - 7 : colX[2] + AXIS_WIDTH + 7} y2={labelY + 4}
-                        stroke="#94a3b8" strokeWidth={0.75}
-                      />
-                    )}
-                    <text x={labelX} y={labelY} dy="0.35em" textAnchor={anchor}
-                      fontSize={fontSize}
-                      fontFamily="ui-sans-serif, system-ui, sans-serif"
-                      fill={!hovered || isAct ? "#1e293b" : "#94a3b8"}
-                      className="transition-all duration-150"
-                    >
-                      {axisLabel(ai, node.value)}
-                    </text>
-                    {isAct && nodeH > 14 && (
-                      <text x={labelX} y={labelY + 14} dy="0.35em" textAnchor={anchor}
-                        fontSize={9}
-                        fontFamily="ui-sans-serif, system-ui, sans-serif" fill="#64748b"
+                const fontSize = isBookAxis
+                  ? (nodeH > 18 ? 10 : 9)
+                  : (nodeH > 24 ? 12 : 10);
+
+                return (
+                  <g key={node.value} className="cursor-pointer"
+                    onMouseEnter={(e) => { e.stopPropagation(); setHovered(nodeKey); }}
+                    onMouseLeave={() => setHovered(null)}
+                  >
+                    <rect
+                      x={colX[ai]} y={yTop}
+                      width={AXIS_WIDTH} height={Math.max(nodeH, 1)}
+                      fill={dim.color(node.value)}
+                      opacity={!hovered ? 0.80 : isAct ? 1 : 0.28}
+                      rx={2} className="transition-opacity duration-150"
+                    />
+                    <g className="pointer-events-none">
+                      {/* Callout tick for tiny nodes on left-edge axes */}
+                      {isTiny && (isFirst || isBookAxis) && (
+                        <line
+                          x1={isFirst ? colX[0] - 4 : colX[ai] + AXIS_WIDTH + 4} y1={midY}
+                          x2={isFirst ? colX[0] - 7 : colX[ai] + AXIS_WIDTH + 7} y2={labelY + 4}
+                          stroke="#94a3b8" strokeWidth={0.75}
+                        />
+                      )}
+                      <text x={labelX} y={labelY} dy="0.35em" textAnchor={anchor}
+                        fontSize={fontSize}
+                        fontFamily="ui-sans-serif, system-ui, sans-serif"
+                        fill={!hovered || isAct ? "#1e293b" : "#94a3b8"}
+                        className="transition-all duration-150"
                       >
-                        {node.total}
+                        {dim.label(node.value)}
                       </text>
-                    )}
+                      {isAct && nodeH > 14 && (
+                        <text x={labelX} y={labelY + 14} dy="0.35em" textAnchor={anchor}
+                          fontSize={9}
+                          fontFamily="ui-sans-serif, system-ui, sans-serif" fill="#64748b"
+                        >
+                          {node.total}
+                        </text>
+                      )}
+                    </g>
                   </g>
-                </g>
-              );
-            })}
-          </g>
-        ))}
+                );
+              })}
+            </g>
+          );
+        })}
 
         {/* ── Axis header labels ── */}
-        {AXIS_HEADERS.map((label, i) => (
-          <text key={label}
+        {dimensions.map((dim, i) => (
+          <text key={dim.key}
             x={colX[i] + AXIS_WIDTH / 2} y={top - 16}
             textAnchor="middle" fontSize={10} fontWeight={600} letterSpacing={0.8}
             fontFamily="ui-sans-serif, system-ui, sans-serif" fill="#64748b"
             className="pointer-events-none"
           >
-            {label}
+            {dim.header}
           </text>
         ))}
 
         {/* ── Sidebar connector tail ── */}
         {connector && (() => {
-          // Only show for the clicked/selected ribbon, not hover.
           const activeKey = connector.selectedKey;
           if (!activeKey) return null;
           const r = ribbons.find((rb) => rb.key === activeKey);
           if (!r) return null;
 
           const lastSpan = r.spans[r.spans.length - 1];
-          // Right edge of the last axis bar — where the ribbon ends
           const leftX   = colX[axisCount - 1] + AXIS_WIDTH;
           const leftTop = py(lastSpan[2]);
           const leftBot = py(lastSpan[3]);
-          // Target: left edge of the sidebar (past the gap)
           const rightX   = width + connector.gap;
           const rightTop = 0;
           const rightBot = connector.headerHeight;
@@ -504,12 +583,9 @@ export default function ParallelSets({
             "Z",
           ].join(" ");
 
-          const fill    = ribbonFill(r);
-          const opacity = 0.14;
-
           return (
             <path
-              d={d} fill={fill} opacity={opacity}
+              d={d} fill={ribbonFill(r)} opacity={0.14}
               className="pointer-events-none transition-opacity duration-200"
             />
           );
@@ -521,28 +597,46 @@ export default function ParallelSets({
           if (!r) return null;
           const midY = py((r.spans[0][0] + r.spans[0][1]) / 2);
           const midX = (colX[0] + AXIS_WIDTH + colX[1]) / 2;
-          const bookStr = r.book ? ` · ${BOOK_ABBREVIATIONS[r.book] ?? r.book}` : "";
-          const countStr = commonlyCitedOnly && r.citedCount > 0
+
+          const otRootIdx = dimIdx("otRoot");
+          const speaker   = r.path[dimIdx("speaker")];
+          const section   = r.path[dimIdx("section")];
+          const dataset   = r.path[dimIdx("dataset")] as Dataset;
+          const bookVal   = dimIdx("book") >= 0 ? r.path[dimIdx("book")] : "";
+          const otRootVal = otRootIdx >= 0 ? r.path[otRootIdx] : "";
+
+          const bookStr   = bookVal ? ` · ${BOOK_ABBREVIATIONS[bookVal] ?? bookVal}` : "";
+          const rootStr   = otRootVal ? `${OT_ROOT_ABBREVIATIONS[otRootVal] ?? otRootVal} · ` : "";
+          const countStr  = commonlyCitedOnly && r.citedCount > 0
             ? `${r.citedCount} cited / ${r.count} total`
             : `${r.count} record${r.count !== 1 ? "s" : ""}`;
+
           return (
             <g className="pointer-events-none">
-              <rect x={midX - 84} y={midY - 32} width={168} height={54}
+              <rect x={midX - 96} y={midY - 40} width={192} height={68}
                 rx={6} fill="white" stroke="#e2e8f0" strokeWidth={1}
                 filter="drop-shadow(0 1px 4px rgba(0,0,0,0.10))"
               />
-              <text x={midX} y={midY - 16} textAnchor="middle"
+              {otRootVal && (
+                <text x={midX} y={midY - 25} textAnchor="middle"
+                  fontSize={9} fontWeight={600} letterSpacing={0.5}
+                  fontFamily="ui-sans-serif, system-ui, sans-serif" fill="#94a3b8"
+                >
+                  {rootStr.replace(" · ", "")}
+                </text>
+              )}
+              <text x={midX} y={midY - (otRootVal ? 10 : 16)} textAnchor="middle"
                 fontSize={10} fontWeight={600}
                 fontFamily="ui-sans-serif, system-ui, sans-serif" fill="#1e293b"
               >
-                {r.speaker}{bookStr}
+                {speaker}{bookStr}
               </text>
-              <text x={midX} y={midY - 2} textAnchor="middle"
+              <text x={midX} y={midY + (otRootVal ? 4 : -2)} textAnchor="middle"
                 fontSize={10} fontFamily="ui-sans-serif, system-ui, sans-serif" fill="#64748b"
               >
-                {DATASET_LABELS[r.dataset]} · {r.section.replace(" Epistles", " Ep.")}
+                {DATASET_LABELS[dataset]} · {String(section).replace(" Epistles", " Ep.")}
               </text>
-              <text x={midX} y={midY + 13} textAnchor="middle"
+              <text x={midX} y={midY + (otRootVal ? 19 : 13)} textAnchor="middle"
                 fontSize={10} fontFamily="ui-sans-serif, system-ui, sans-serif" fill="#94a3b8"
               >
                 {countStr}

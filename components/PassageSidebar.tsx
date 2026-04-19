@@ -52,9 +52,10 @@ const Q2_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
 
 export interface RibbonSelection {
   key:     string;
+  otRoot:  string;      // "" when the OT Root axis is disabled
   speaker: SpeakerGroup;
   section: NTSection;
-  book:    string;      // "" in 3-axis mode
+  book:    string;      // "" when the Book axis is disabled
   dataset: Dataset;
   count:   number;
 }
@@ -176,7 +177,8 @@ export default function PassageSidebar({ selection, records, onClearSelection }:
         r.speaker_group === selection.speaker &&
         r.dataset       === selection.dataset &&
         r.nt_section    === selection.section &&
-        (!selection.book || r.book === selection.book)
+        (!selection.book   || r.book              === selection.book)   &&
+        (!selection.otRoot || (r.ot_root_category ?? "(uncategorized)") === selection.otRoot)
     );
     const dsBg    = DATASET_COLORS_LIGHT[selection.dataset];
     const dsFg    = DATASET_COLORS[selection.dataset];
@@ -208,13 +210,18 @@ export default function PassageSidebar({ selection, records, onClearSelection }:
           </h2>
           <p className="text-[10px] text-stone-400 mt-0.5">{selection.section}</p>
 
-          <div className="flex items-center gap-2 mt-2.5">
+          <div className="flex items-center gap-2 mt-2.5 flex-wrap">
             <span
               className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold"
               style={{ backgroundColor: dsBg, color: dsFg }}
             >
               {selection.dataset} — {dsLabel}
             </span>
+            {selection.otRoot && selection.otRoot !== "(uncategorized)" && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-stone-200 text-stone-700">
+                {selection.otRoot}
+              </span>
+            )}
             <span className="text-[10px] text-stone-400">
               {cohort.length} passage{cohort.length !== 1 ? "s" : ""}
             </span>

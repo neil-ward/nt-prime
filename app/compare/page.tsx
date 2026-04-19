@@ -68,7 +68,8 @@ export default function ComparePage() {
   const [commonlyCitedOnly, setCommonlyCitedOnly] = useState(false);
   const [primaryOnly,       setPrimaryOnly]       = useState(false);
   const [showBook,          setShowBook]          = useState(false);
-  const [colorBy,           setColorBy]           = useState<"dataset" | "speaker">("dataset");
+  const [showOTRoot,        setShowOTRoot]        = useState(false);
+  const [colorBy,           setColorBy]           = useState<"dataset" | "speaker" | "otRoot">("dataset");
   const [selectedRibbon,    setSelectedRibbon]    = useState<RibbonSelection | null>(null);
   const [showStats,         setShowStats]         = useState(false);
 
@@ -108,7 +109,8 @@ export default function ComparePage() {
 
   const ratios = aggregates?.key_ratios;
 
-  const vizHeight = showBook ? 680 : 600;
+  const extraHeight = (showBook ? 80 : 0) + (showOTRoot ? 40 : 0);
+  const vizHeight = 600 + extraHeight;
 
   return (
     <div className="min-h-screen bg-stone-100">
@@ -221,7 +223,15 @@ export default function ComparePage() {
 
           <span className="text-stone-200 self-center select-none mx-1">|</span>
 
-          <Tip label="Adds a Book axis between NT Section and Dataset, expanding to 4 axes across all 27 NT books. Reveals that Mark contributes only 4 unique commands (most parallel Matthew/Luke), while Matthew, Luke, and the Pauline corpus each dominate their sections.">
+          <Tip label="Adds an OT Root axis as the leftmost axis, tracing each command from its OT/ANE ethical register (Justice & Mercy, Covenant Loyalty, Economic Compassion, etc.) through speaker, section, and dataset. Useful for seeing where commands originated — e.g. Dataset D 'Social Codes' actually fans out across all 7 registers.">
+            <button
+              onClick={() => setShowOTRoot((v) => !v)}
+              className={`px-3 py-1.5 rounded text-xs font-semibold border transition-all duration-150 ${showOTRoot ? "bg-emerald-600 text-white border-transparent" : "bg-white text-stone-400 border-stone-200 hover:border-stone-300"}`}>
+              {showOTRoot ? "Hide OT root" : "Show OT root"}
+            </button>
+          </Tip>
+
+          <Tip label="Adds a Book axis between NT Section and Dataset, expanding across all 27 NT books. Reveals that Mark contributes only 4 unique commands (most parallel Matthew/Luke), while Matthew, Luke, and the Pauline corpus each dominate their sections.">
             <button
               onClick={() => setShowBook((v) => !v)}
               className={`px-3 py-1.5 rounded text-xs font-semibold border transition-all duration-150 ${showBook ? "bg-violet-600 text-white border-transparent" : "bg-white text-stone-400 border-stone-200 hover:border-stone-300"}`}>
@@ -229,13 +239,21 @@ export default function ComparePage() {
             </button>
           </Tip>
 
-          <Tip label={colorBy === "dataset"
-            ? "Currently coloring by Dataset (teal = Mercy, blue = Doctrine, coral = Social). Click to switch to Speaker coloring — reveals whose voice dominates each book and section."
-            : "Currently coloring by Speaker (violet = Jesus, blue = Paul, green = Peter, etc.). Click to switch to Dataset coloring — reveals the type-distribution of commands."}>
+          <Tip label={
+            colorBy === "dataset"
+              ? "Currently coloring by Dataset (teal = Mercy, blue = Doctrine, coral = Social). Click to cycle: Dataset → Speaker → OT Root."
+              : colorBy === "speaker"
+                ? "Currently coloring by Speaker (violet = Jesus, blue = Paul, green = Peter, etc.). Click to cycle to OT Root coloring."
+                : "Currently coloring by OT Root (violet = Covenant, teal = Justice & Mercy, amber = Economic Compassion, etc.). Click to cycle back to Dataset."
+          }>
             <button
-              onClick={() => setColorBy((v) => v === "dataset" ? "speaker" : "dataset")}
+              onClick={() => setColorBy((v) =>
+                v === "dataset" ? "speaker"
+                : v === "speaker" ? "otRoot"
+                : "dataset"
+              )}
               className="px-3 py-1.5 rounded text-xs font-semibold border transition-all duration-150 bg-white text-stone-500 border-stone-200 hover:border-stone-300">
-              Color: {colorBy === "dataset" ? "Dataset" : "Speaker"}
+              Color: {colorBy === "dataset" ? "Dataset" : colorBy === "speaker" ? "Speaker" : "OT Root"}
             </button>
           </Tip>
 
@@ -251,11 +269,13 @@ export default function ComparePage() {
               records={vizRecords}
               height={vizHeight}
               showBook={showBook}
+              showOTRoot={showOTRoot}
               commonlyCitedOnly={commonlyCitedOnly}
               colorBy={colorBy}
               onRibbonClick={(payload: RibbonClickPayload) =>
                 setSelectedRibbon({
                   key:     payload.key,
+                  otRoot:  payload.otRoot,
                   speaker: payload.speaker,
                   section: payload.section,
                   book:    payload.book,

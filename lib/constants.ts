@@ -41,6 +41,51 @@ export const OT_ROOT_CATEGORIES = [
 
 export type OTRootCategory = typeof OT_ROOT_CATEGORIES[number];
 
+/**
+ * Order for axis display in visualizations. Placed warm→cool to read as
+ * a spectrum: relational/communal registers first, then character-based,
+ * then ritual and creation care.
+ */
+export const OT_ROOT_ORDER: readonly string[] = [
+  "Covenant Loyalty",
+  "Justice & Mercy",
+  "Economic Compassion",
+  "Communal Peace & Honor",
+  "Wisdom & Character",
+  "Sexual Ethics & Family Order",
+  "Ritual Purity",
+  "Land & Creation Care",
+] as const;
+
+/** Axis-node colors. Distinct but muted to work with ribbons at low opacity. */
+export const OT_ROOT_COLORS: Record<string, string> = {
+  "Covenant Loyalty":             "#7c3aed", // violet-600
+  "Justice & Mercy":              "#0d9488", // teal-700
+  "Economic Compassion":          "#d97706", // amber-700
+  "Communal Peace & Honor":       "#059669", // emerald-600
+  "Wisdom & Character":           "#78716c", // stone-500
+  "Sexual Ethics & Family Order": "#db2777", // pink-600
+  "Ritual Purity":                "#475569", // slate-600
+  "Land & Creation Care":         "#65a30d", // lime-600
+};
+
+/** Short labels for the axis — long full names don't fit the gutter. */
+export const OT_ROOT_ABBREVIATIONS: Record<string, string> = {
+  "Covenant Loyalty":             "Covenant",
+  "Justice & Mercy":              "Justice",
+  "Economic Compassion":          "Economic",
+  "Communal Peace & Honor":       "Communal",
+  "Wisdom & Character":           "Wisdom",
+  "Sexual Ethics & Family Order": "Sex/Family",
+  "Ritual Purity":                "Ritual",
+  "Land & Creation Care":         "Creation",
+};
+
+export function otRootColor(v: string | null | undefined): string {
+  if (!v) return "#94a3b8";
+  return OT_ROOT_COLORS[v] ?? "#94a3b8";
+}
+
 export const DATASET_COLORS_LIGHT: Record<Dataset, string> = {
   A: "#d4f0ed", // soft teal tint
   B: "#daeaf3", // soft blue tint
