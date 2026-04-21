@@ -71,7 +71,7 @@ export default function ComparePage() {
   const [showOTRoot,        setShowOTRoot]        = useState(false);
   const [colorBy,           setColorBy]           = useState<"dataset" | "speaker" | "otRoot">("dataset");
   const [selectedRibbon,    setSelectedRibbon]    = useState<RibbonSelection | null>(null);
-  const [showStats,         setShowStats]         = useState(false);
+  const [showStats,         setShowStats]         = useState(true);
 
   useEffect(() => {
     Promise.all([loadRecords(), loadAggregates()])
@@ -138,6 +138,10 @@ export default function ComparePage() {
             Each ribbon traces a cohort of passages from their speaker through their NT location
             and command dataset. Width is proportional to record count. Click any ribbon to
             browse its passages.
+          </p>
+          <p className="text-stone-400 text-[12px] max-w-2xl leading-relaxed mt-1">
+            Filter by dataset, SBC cited passages, and primary vs duplicate commands. Explore
+            OT antecedents and books of the NT. Ribbons can be colored by dataset or by speaker.
           </p>
 
           {/* Collapsible stats */}

@@ -293,7 +293,7 @@ function RecordsContent() {
 
       {/* ── Slide-in editor ── */}
       {editing && (
-        <aside className="w-[520px] shrink-0 border-l border-stone-200 bg-white flex flex-col overflow-hidden animate-[slideLeft_200ms_ease-out]">
+        <aside className="w-[520px] shrink-0 h-full border-l border-stone-200 bg-white flex flex-col overflow-hidden animate-[slideLeft_200ms_ease-out]">
           <RecordEditor
             record={editing}
             onSave={saveEdit}
@@ -304,7 +304,7 @@ function RecordsContent() {
       )}
 
       {creating && (
-        <aside className="w-[520px] shrink-0 border-l border-stone-200 bg-white flex flex-col overflow-hidden animate-[slideLeft_200ms_ease-out]">
+        <aside className="w-[520px] shrink-0 h-full border-l border-stone-200 bg-white flex flex-col overflow-hidden animate-[slideLeft_200ms_ease-out]">
           <RecordEditor
             record={{ dataset: "A" as Dataset, primary_record: true, commonly_cited: false }}
             isNew

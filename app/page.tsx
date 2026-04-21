@@ -44,10 +44,9 @@ export default function HomePage() {
           What does the New Testament actually emphasize?
         </h1>
         <p className="text-stone-500 text-base leading-relaxed max-w-2xl mb-10">
-          385 NT commands, classified across three research datasets, scored for
-          rhetorical strength, and cross-referenced against the passages most
-          cited in SBC doctrinal literature. An independent, data-driven look at
-          the shape of NT ethics.
+          385 NT commands, classified across three research datasets, and scored
+          for rhetorical strength. An independent, data-driven look at the shape
+          of NT ethics.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link

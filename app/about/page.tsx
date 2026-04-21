@@ -114,9 +114,8 @@ export default function AboutPage() {
             and how directly they are framed.
           </P>
           <P>
-            A secondary question motivates the Dataset D classification: how consistently
-            do institutions that claim biblical authority actually apply the passages they
-            cite most often? The goal is to answer empirically rather than polemically.
+            One primary question framed this research: Is the theological emphasis by
+            contemporary authors/pastors reflective of the emphasis we see in the Bible?
           </P>
         </Section>
 
