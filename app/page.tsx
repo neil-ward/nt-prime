@@ -59,20 +59,20 @@ export default function HomePage() {
             href="/compare"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded bg-stone-900 text-white text-sm font-medium hover:bg-stone-700 transition-colors"
           >
-            Compare datasets
+            Explore datasets
             <span aria-hidden>→</span>
           </Link>
           <Link
             href="/explore"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded border border-stone-300 text-stone-600 text-sm font-medium hover:border-stone-400 hover:text-stone-900 transition-colors"
           >
-            Explore patterns
+            Discover patterns
           </Link>
           <Link
             href="/browse"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded border border-stone-300 text-stone-600 text-sm font-medium hover:border-stone-400 hover:text-stone-900 transition-colors"
           >
-            Browse all passages
+            Browse all commands
           </Link>
         </div>
       </section>

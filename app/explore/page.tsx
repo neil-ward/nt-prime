@@ -309,7 +309,7 @@ export default function ExplorePage() {
             num="03"
             title="How directly are the commands framed?"
             subtitle="Proportional bars show the rhetorical register of each dataset — from Explicit Command (unambiguous directive) to Narrative Example (story-shaped teaching)."
-            insight="Dataset D stands apart: 79 % of its records are classified as Explicit Command, the highest-certainty rhetorical form — direct, unambiguous, first-person directives. Yet these are the passages most flagged for inconsistent application in the Q2 analysis. Datasets A and B lean on Direct Imperatives and Narrative Examples, suggesting their commands are often embedded in story or argument rather than rule."
+            insight="Dataset D stands apart: 79 % of its records are classified as Explicit Command, the highest-certainty rhetorical form — direct, unambiguous, first-person directives. Datasets A and B lean on Direct Imperatives and Narrative Examples, suggesting their commands are often embedded in story or argument rather than rule."
           >
             <StrengthProfile records={filtered} onSelect={handleSelect} />
           </VizSection>

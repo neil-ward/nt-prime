@@ -39,12 +39,6 @@ const STRENGTH_STYLE: Record<string, { bg: string; fg: string }> = {
   "Narrative Example":  { bg: "#f5f5f4", fg: "#a8a29e" },
 };
 
-const Q2_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
-  "CONSISTENT":           { bg: "#e6f0ea", fg: "#1e4d33", label: "Consistent"   },
-  "PARTIALLY CONSISTENT": { bg: "#fef3c7", fg: "#92400e", label: "Partial"      },
-  "SELECTIVE":            { bg: "#fde8e2", fg: "#c2410c", label: "Selective"    },
-  "INCONSISTENT":         { bg: "#f0e4e4", fg: "#8b1c1c", label: "Inconsistent" },
-};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,7 +68,6 @@ function PassageRow({ p, dsFg }: { p: NTRecord; dsFg: string }) {
   const { openVerse, version } = useVerse();
   const url      = makeYouVersionUrl(p.book, p.chapter, p.verse_range, version);
   const strength = p.command_strength_group ? STRENGTH_STYLE[p.command_strength_group] : null;
-  const q2       = p.q2_consistency_rating  ? Q2_STYLE[p.q2_consistency_rating]        : null;
 
   return (
     <li className="px-4 py-3 hover:bg-stone-100/70 transition-colors">
@@ -109,24 +102,14 @@ function PassageRow({ p, dsFg }: { p: NTRecord; dsFg: string }) {
       </div>
 
       {/* Tags */}
-      {(strength || q2) && (
+      {strength && (
         <div className="flex flex-wrap gap-1 mb-1.5">
-          {strength && (
-            <span
-              className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-semibold"
-              style={{ backgroundColor: strength.bg, color: strength.fg }}
-            >
-              {p.command_strength_group}
-            </span>
-          )}
-          {q2 && (
-            <span
-              className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-semibold"
-              style={{ backgroundColor: q2.bg, color: q2.fg }}
-            >
-              {q2.label}
-            </span>
-          )}
+          <span
+            className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-semibold"
+            style={{ backgroundColor: strength.bg, color: strength.fg }}
+          >
+            {p.command_strength_group}
+          </span>
         </div>
       )}
 

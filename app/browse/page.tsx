@@ -29,12 +29,6 @@ const STRENGTH_STYLE: Record<string, { bg: string; fg: string }> = {
   "Narrative Example":  { bg: "#f5f5f4", fg: "#a8a29e" },
 };
 
-const Q2_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
-  "CONSISTENT":           { bg: "#e6f0ea", fg: "#1e4d33", label: "Consistent"   },
-  "PARTIALLY CONSISTENT": { bg: "#fef3c7", fg: "#92400e", label: "Partial"      },
-  "SELECTIVE":            { bg: "#fde8e2", fg: "#c2410c", label: "Selective"    },
-  "INCONSISTENT":         { bg: "#f0e4e4", fg: "#8b1c1c", label: "Inconsistent" },
-};
 
 const STRENGTH_GROUPS = [
   "Explicit Command", "Direct Imperative", "Implicit Command",
@@ -51,7 +45,6 @@ function PassageRow({ p }: { p: NTRecord }) {
   const dsFg     = DATASET_COLORS[p.dataset];
   const dsBg     = DATASET_COLORS_LIGHT[p.dataset];
   const strength = p.command_strength_group ? STRENGTH_STYLE[p.command_strength_group] : null;
-  const q2       = p.q2_consistency_rating   ? Q2_STYLE[p.q2_consistency_rating]        : null;
 
   return (
     <li className="flex gap-4 px-5 py-3.5 hover:bg-stone-100/60 transition-colors border-b border-stone-200/50 last:border-0">
@@ -78,14 +71,6 @@ function PassageRow({ p }: { p: NTRecord }) {
             style={{ backgroundColor: strength.bg, color: strength.fg }}
           >
             {p.command_strength_group}
-          </span>
-        )}
-        {q2 && (
-          <span
-            className="inline-flex items-center self-start px-1.5 py-px rounded text-[9px] font-semibold"
-            style={{ backgroundColor: q2.bg, color: q2.fg }}
-          >
-            {q2.label}
           </span>
         )}
       </div>
